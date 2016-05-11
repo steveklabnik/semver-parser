@@ -22,9 +22,9 @@ lazy_static! {
 }
 
 pub struct Version {
-    major: u64,
-    minor: u64,
-    patch: u64,
+    pub major: u64,
+    pub minor: u64,
+    pub patch: u64,
 }
 
 pub fn parse_version(version: &str) -> Result<Version, Box<Error>> {
