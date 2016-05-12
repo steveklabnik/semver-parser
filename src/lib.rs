@@ -14,7 +14,7 @@ lazy_static! {
         let minor = numeric_identifier;
         let patch = numeric_identifier;
 
-        let letters_numbers_dash_dot = r"[.-A-Za-z0-9]+";
+        let letters_numbers_dash_dot = r"[-.A-Za-z0-9]+";
 
         // This regex does not fully parse prereleases, just extracts the whole prerelease string.
         // parse_version() will parse this further.
@@ -38,6 +38,7 @@ lazy_static! {
             patch,
             pre,
             build);
+        println!("{:?}", regex);
         let regex = Regex::new(&regex);
         
         // this unwrap is okay because everything above here is const, so this will never fail.
@@ -312,5 +313,19 @@ mod tests {
 
         let expected_build = Some(vec![Identifier::AlphaNumeric(String::from("0851523"))]);
         assert_eq!(expected_build, parsed.build);
+    }
+
+    #[test]
+    fn parse_regression_01() {
+        let version = "0.0.0-WIP";
+
+        let parsed = parse_version(version).unwrap();
+
+        assert_eq!(0, parsed.major);
+        assert_eq!(0, parsed.minor);
+        assert_eq!(0, parsed.patch);
+
+        let expected_pre = Some(vec![Identifier::AlphaNumeric(String::from("WIP"))]);
+        assert_eq!(expected_pre, parsed.pre);
     }
 }
