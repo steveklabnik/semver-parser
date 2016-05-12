@@ -5,8 +5,6 @@ extern crate lazy_static;
 
 use regex::Regex;
 
-use std::error::Error;
-
 lazy_static! {
     static ref REGEX: Regex = {
         // a numeric identifier is either zero or multiple numbers without a leading zero
@@ -64,7 +62,7 @@ pub enum Identifier {
     AlphaNumeric(String),
 }
 
-pub fn parse_version(version: &str) -> Result<Version, Box<Error>> {
+pub fn parse_version(version: &str) -> Result<Version, String> {
     let captures = match REGEX.captures(version.trim()) {
         Some(captures) => captures,
         None => return Err(From::from("Version did not parse properly.")),
