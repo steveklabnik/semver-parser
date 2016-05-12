@@ -9,11 +9,17 @@ use std::error::Error;
 
 lazy_static! {
     static ref REGEX: Regex = {
-        let major = r"0|(:?[1-9][0-9]*)";
-        let minor = r"0|(:?[1-9][0-9]*)";
-        let patch = r"0|(:?[1-9][0-9]*)";
+        // a numeric identifier is either zero or multiple numbers without a leading zero
+        let numeric_identifier = r"0|(:?[1-9][0-9]*)";
 
-        let regex = format!(r"^(?P<major>{})\.(?P<minor>{})\.(?P<patch>{})$", major, minor, patch);
+        let major = numeric_identifier;
+        let minor = numeric_identifier;
+        let patch = numeric_identifier;
+        
+        let pre = r"\w+";
+
+        let regex = format!(r"^(?P<major>{})\.(?P<minor>{})\.(?P<patch>{})(:?-(?P<pre>{}))?$", major, minor, patch, pre);
+        println!("{}", regex);
         let regex = Regex::new(&regex);
         
         // this unwrap is okay because everything above here is const, so this will never fail.
@@ -25,6 +31,7 @@ pub struct Version {
     pub major: u64,
     pub minor: u64,
     pub patch: u64,
+    pub pre: Option<String>,
 }
 
 pub fn parse_version(version: &str) -> Result<Version, Box<Error>> {
@@ -37,6 +44,7 @@ pub fn parse_version(version: &str) -> Result<Version, Box<Error>> {
         major: captures.name("major").unwrap().parse().unwrap(),
         minor: captures.name("minor").unwrap().parse().unwrap(),
         patch: captures.name("patch").unwrap().parse().unwrap(),
+        pre: captures.name("pre").map(ToString::to_string)
     })
 }
 
@@ -80,5 +88,14 @@ mod tests {
         let parsed = parse_version(version);
 
         assert!(parsed.is_err(), "01 incorrectly considered a valid patch version");
+    }
+
+    #[test]
+    fn parse_version_basic_prerelease() {
+        let version = "1.2.3-pre";
+
+        let parsed = parse_version(version).unwrap();
+
+        assert_eq!(Some(String::from("pre")), parsed.pre);
     }
 }
