@@ -91,7 +91,10 @@ fn parse_meta(pre: &str) -> Vec<Identifier> {
 
     pre.split(".")
         .map(|part| {
-            if regex.is_match(part) {
+            // another wrinkle: we made sure that any number starts with a non-zero. But there's a
+            // problem: an actual zero is a number, yet gets left out by this heuristic. So let's
+            // also check for the single, lone zero.
+            if regex.is_match(part) || part == "0" {
                 // we can unwrap here because we know it is only digits due to the regex
                 Identifier::Numeric(part.parse().unwrap())
             } else {
@@ -233,6 +236,17 @@ mod tests {
         let parsed = parse_version(version).unwrap();
 
         let expected_pre = Some(vec![Identifier::AlphaNumeric(String::from("alpha1"))]);
+        assert_eq!(expected_pre, parsed.pre);
+    }
+
+    #[test]
+    fn parse_version_prerelease_zero() {
+        let version = "1.2.3-pre.0";
+
+        let parsed = parse_version(version).unwrap();
+
+        let expected_pre = Some(vec![Identifier::AlphaNumeric(String::from("pre")),
+                                     Identifier::Numeric(0)]);
         assert_eq!(expected_pre, parsed.pre);
     }
 
