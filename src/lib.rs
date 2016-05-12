@@ -38,7 +38,6 @@ lazy_static! {
             patch,
             pre,
             build);
-        println!("{}", regex);
         let regex = Regex::new(&regex);
         
         // this unwrap is okay because everything above here is const, so this will never fail.
