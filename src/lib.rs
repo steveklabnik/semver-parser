@@ -52,8 +52,16 @@ pub struct Version {
     pub major: u64,
     pub minor: u64,
     pub patch: u64,
-    pub pre: Option<Vec<String>>,
-    pub build: Option<Vec<String>>,
+    pub pre: Option<Vec<Identifier>>,
+    pub build: Option<Vec<Identifier>>,
+}
+
+#[derive(Debug,PartialEq)]
+pub enum Identifier {
+    /// An identifier that's solely numbers.
+    Numeric(u64),
+    /// An identifier with letters and numbers.
+    AlphaNumeric(String),
 }
 
 pub fn parse_version(version: &str) -> Result<Version, Box<Error>> {
@@ -62,13 +70,9 @@ pub fn parse_version(version: &str) -> Result<Version, Box<Error>> {
         None => return Err(From::from("Version did not parse properly.")),
     };
 
-    let pre = captures.name("pre").map(|pre| {
-        vec![pre.to_string()] 
-    });
+    let pre = captures.name("pre").map(parse_meta);
 
-    let build = captures.name("build").map(|build| {
-        vec![build.to_string()] 
-    });
+    let build = captures.name("build").map(parse_meta);
 
     Ok(Version {
         major: captures.name("major").unwrap().parse().unwrap(),
@@ -77,6 +81,26 @@ pub fn parse_version(version: &str) -> Result<Version, Box<Error>> {
         pre: pre,
         build: build,
     })
+}
+
+// by the time we get here, we know that it's all valid characters, so this doesn't need to return
+// a result or anything
+fn parse_meta(pre: &str) -> Vec<Identifier> {
+    // Originally, I wanted to implement this method via calling parse, but parse is tolerant of
+    // leading zeroes, and we want anything with leading zeroes to be considered alphanumeric, not
+    // numeric. So the strategy is to check with a regex first, and then call parse once we've
+    // determined that it's a number without a leading zero.
+    let regex = Regex::new(r"^[1-9][0-9]*$").unwrap();
+
+    pre.split(".")
+        .map(|part| {
+            if regex.is_match(part) {
+                // we can unwrap here because we know it is only digits due to the regex
+                Identifier::Numeric(part.parse().unwrap())
+            } else {
+                Identifier::AlphaNumeric(part.to_string())
+            }
+        }).collect()
 }
 
 #[cfg(test)]
@@ -201,7 +225,7 @@ mod tests {
 
         let parsed = parse_version(version).unwrap();
 
-        let expected_pre = Some(vec![String::from("pre")]);
+        let expected_pre = Some(vec![Identifier::AlphaNumeric(String::from("pre"))]);
         assert_eq!(expected_pre, parsed.pre);
     }
 
@@ -211,7 +235,7 @@ mod tests {
 
         let parsed = parse_version(version).unwrap();
 
-        let expected_pre = Some(vec![String::from("alpha1")]);
+        let expected_pre = Some(vec![Identifier::AlphaNumeric(String::from("alpha1"))]);
         assert_eq!(expected_pre, parsed.pre);
     }
 
@@ -221,7 +245,7 @@ mod tests {
 
         let parsed = parse_version(version).unwrap();
 
-        let expected_build = Some(vec![String::from("build")]);
+        let expected_build = Some(vec![Identifier::AlphaNumeric(String::from("build"))]);
         assert_eq!(expected_build, parsed.build);
     }
 
@@ -231,7 +255,7 @@ mod tests {
 
         let parsed = parse_version(version).unwrap();
 
-        let expected_build = Some(vec![String::from("build5")]);
+        let expected_build = Some(vec![Identifier::AlphaNumeric(String::from("build5"))]);
         assert_eq!(expected_build, parsed.build);
     }
 
@@ -241,10 +265,10 @@ mod tests {
 
         let parsed = parse_version(version).unwrap();
 
-        let expected_pre = Some(vec![String::from("alpha1")]);
+        let expected_pre = Some(vec![Identifier::AlphaNumeric(String::from("alpha1"))]);
         assert_eq!(expected_pre, parsed.pre);
 
-        let expected_build = Some(vec![String::from("build5")]);
+        let expected_build = Some(vec![Identifier::AlphaNumeric(String::from("build5"))]);
         assert_eq!(expected_build, parsed.build);
     }
 
@@ -254,10 +278,14 @@ mod tests {
 
         let parsed = parse_version(version).unwrap();
 
-        let expected_pre = Some(vec![String::from("1.alpha1.9")]);
+        let expected_pre = Some(vec![Identifier::Numeric(1),
+                                     Identifier::AlphaNumeric(String::from("alpha1")),
+                                     Identifier::Numeric(9)]);
         assert_eq!(expected_pre, parsed.pre);
 
-        let expected_build = Some(vec![String::from("build5.7.3aedf")]);
+        let expected_build = Some(vec![Identifier::AlphaNumeric(String::from("build5")),
+                                       Identifier::Numeric(7),
+                                       Identifier::AlphaNumeric(String::from("3aedf"))]);
         assert_eq!(expected_build, parsed.build);
     }
 
@@ -267,10 +295,11 @@ mod tests {
 
         let parsed = parse_version(version).unwrap();
 
-        let expected_pre = Some(vec![String::from("beta.1")]);
+        let expected_pre = Some(vec![Identifier::AlphaNumeric(String::from("beta")),
+                                     Identifier::Numeric(1)]);
         assert_eq!(expected_pre, parsed.pre);
 
-        let expected_build = Some(vec![String::from("0851523")]);
+        let expected_build = Some(vec![Identifier::AlphaNumeric(String::from("0851523"))]);
         assert_eq!(expected_build, parsed.build);
     }
 }
