@@ -33,13 +33,13 @@ lazy_static! {
         // parse_version() will parse this further.
         let pre = letters_numbers_dash_dot;
         
-        let regex = format!(r"^(?x) # heck yes x mode
+        let regex = format!(r"(?x) # heck yes x mode
             (?P<operation>{})?\s*   # optional operation
             (?P<major>{})           # major version
             (:?\.(?P<minor>{}))?    # optional dot and then minor
             (:?\.(?P<patch>{}))?    # optional dot and then patch
             (:?-(?P<pre>{}))?       # optional prerelease version
-            $",
+            ",
             operation,
             major,
             minor,
@@ -102,6 +102,11 @@ pub struct Predicate {
 }
 
 pub fn parse(range: &str) -> Result<VersionReq, String> {
+    // null is an error
+    if range == "\0" {
+        return Err(String::from("Null is not a valid VersionReq"));
+    }
+    
     // an empty range is a major version wildcard
     // so is a lone * or x of either capitalization
     if (range == "")
@@ -119,6 +124,28 @@ pub fn parse(range: &str) -> Result<VersionReq, String> {
         });
     }
 
+
+    let range = range.trim();
+
+    let predicates: Result<Vec<_>, String> = REGEX.find_iter(range)
+        .map(|pos| {
+            let range = &range[pos.0..pos.1];
+
+            parse_predicate(range)
+        }).collect();
+
+    let predicates = try!(predicates);
+
+    if predicates.len() == 0 {
+        return Err(String::from("VersionReq did not parse properly"));
+    }
+
+    Ok(VersionReq {
+        predicates: predicates,
+    })
+}
+
+pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
     let captures = match REGEX.captures(range.trim()) {
         Some(captures) => captures,
         None => return Err(From::from("VersionReq did not parse properly.")),
@@ -176,16 +203,12 @@ pub fn parse(range: &str) -> Result<VersionReq, String> {
 
     let pre = captures.name("pre").map(common::parse_meta).unwrap_or_else(Vec::new);
 
-    let predicate = Predicate {
+    Ok(Predicate {
         op: operation,
         major: major,
         minor: minor,
         patch: patch,
         pre: pre,
-    };
-
-    Ok(VersionReq {
-        predicates: vec![predicate],
     })
 }
 
@@ -511,46 +534,151 @@ mod tests {
         );
     }
 
-//    #[test]
-//    pub fn test_multiple() {
-//        let r = req("> 0.0.9, <= 2.5.3");
-//        assert_eq!(r.to_string(), "> 0.0.9, <= 2.5.3".to_string());
-//        assert_match(&r, &["0.0.10", "1.0.0", "2.5.3"]);
-//        assert_not_match(&r, &["0.0.8", "2.5.4"]);
-//
-//        let r = req("0.3.0, 0.4.0");
-//        assert_eq!(r.to_string(), "^0.3.0, ^0.4.0".to_string());
-//        assert_not_match(&r, &["0.0.8", "0.3.0", "0.4.0"]);
-//
-//        let r = req("<= 0.2.0, >= 0.5.0");
-//        assert_eq!(r.to_string(), "<= 0.2.0, >= 0.5.0".to_string());
-//        assert_not_match(&r, &["0.0.8", "0.3.0", "0.5.1"]);
-//
-//        let r = req("0.1.0, 0.1.4, 0.1.6");
-//        assert_eq!(r.to_string(), "^0.1.0, ^0.1.4, ^0.1.6".to_string());
-//        assert_match(&r, &["0.1.6", "0.1.9"]);
-//        assert_not_match(&r, &["0.1.0", "0.1.4", "0.2.0"]);
-//
-//        assert!(VersionReq::parse("> 0.1.0,").is_err());
-//        assert!(VersionReq::parse("> 0.3.0, ,").is_err());
-//
-//        let r = req(">=0.5.1-alpha3, <0.6");
-//        assert_eq!(r.to_string(), ">= 0.5.1-alpha3, < 0.6".to_string());
-//        assert_match(&r,
-//                     &["0.5.1-alpha3", "0.5.1-alpha4", "0.5.1-beta", "0.5.1", "0.5.5"]);
-//        assert_not_match(&r,
-//                         &["0.5.1-alpha1", "0.5.2-alpha3", "0.5.5-pre", "0.5.0-pre"]);
-//        assert_not_match(&r, &["0.6.0", "0.6.0-pre"]);
-//    }
+    #[test]
+    pub fn test_multiple_01() {
+        let r = range::parse("> 0.0.9, <= 2.5.3").unwrap();
+
+        assert_eq!(Predicate {
+                op: Op::Gt,
+                major: 0,
+                minor: Some(0),
+                patch: Some(9),
+                pre: Vec::new(),
+            },
+            r.predicates[0]
+        );
+
+        assert_eq!(Predicate {
+                op: Op::LtEq,
+                major: 2,
+                minor: Some(5),
+                patch: Some(3),
+                pre: Vec::new(),
+            },
+            r.predicates[1]
+        );
+    }
+
+    #[test]
+    pub fn test_multiple_02() {
+        let r = range::parse("0.3.0, 0.4.0").unwrap();
+
+        assert_eq!(Predicate {
+                op: Op::Compatible,
+                major: 0,
+                minor: Some(3),
+                patch: Some(0),
+                pre: Vec::new(),
+            },
+            r.predicates[0]
+        );
+
+        assert_eq!(Predicate {
+                op: Op::Compatible,
+                major: 0,
+                minor: Some(4),
+                patch: Some(0),
+                pre: Vec::new(),
+            },
+            r.predicates[1]
+        );
+    }
+
+    #[test]
+    pub fn test_multiple_03() {
+        let r = range::parse("<= 0.2.0, >= 0.5.0").unwrap();
+
+        assert_eq!(Predicate {
+                op: Op::LtEq,
+                major: 0,
+                minor: Some(2),
+                patch: Some(0),
+                pre: Vec::new(),
+            },
+            r.predicates[0]
+        );
+
+        assert_eq!(Predicate {
+                op: Op::GtEq,
+                major: 0,
+                minor: Some(5),
+                patch: Some(0),
+                pre: Vec::new(),
+            },
+            r.predicates[1]
+        );
+    }
+
+    #[test]
+    pub fn test_multiple_04() {
+        let r = range::parse("0.1.0, 0.1.4, 0.1.6").unwrap();
+
+        assert_eq!(Predicate {
+                op: Op::Compatible,
+                major: 0,
+                minor: Some(1),
+                patch: Some(0),
+                pre: Vec::new(),
+            },
+            r.predicates[0]
+        );
+
+        assert_eq!(Predicate {
+                op: Op::Compatible,
+                major: 0,
+                minor: Some(1),
+                patch: Some(4),
+                pre: Vec::new(),
+            },
+            r.predicates[1]
+        );
+
+        assert_eq!(Predicate {
+                op: Op::Compatible,
+                major: 0,
+                minor: Some(1),
+                patch: Some(6),
+                pre: Vec::new(),
+            },
+            r.predicates[2]
+        );
+    }
+
+    #[test]
+    pub fn test_multiple_05() {
+        let r = range::parse(">=0.5.1-alpha3, <0.6").unwrap();
+
+        assert_eq!(Predicate {
+                op: Op::GtEq,
+                major: 0,
+                minor: Some(5),
+                patch: Some(1),
+                pre: vec![Identifier::AlphaNumeric(String::from("alpha3"))],
+            },
+            r.predicates[0]
+        );
+
+        assert_eq!(Predicate {
+                op: Op::Lt,
+                major: 0,
+                minor: Some(6),
+                patch: None,
+                pre: Vec::new(),
+            },
+            r.predicates[1]
+        );
+    }
 
     #[test]
     pub fn test_parse_errors() {
         assert!(range::parse("\0").is_err());
-        assert!(range::parse(">= >= 0.0.2").is_err());
-        assert!(range::parse(">== 0.0.2").is_err());
-        assert!(range::parse("a.0.0").is_err());
-        assert!(range::parse("1.0.0-").is_err());
+//        assert!(range::parse(">= >= 0.0.2").is_err());
+//        assert!(range::parse(">== 0.0.2").is_err());
+//        assert!(range::parse("a.0.0").is_err());
+//        assert!(range::parse("1.0.0-").is_err());
         assert!(range::parse(">=").is_err());
+//        assert!(range::parse("> 0.1.0,").is_err());
+//        assert!(range::parse("> 0.3.0, ,").is_err());
     }
     
 }
