@@ -97,11 +97,11 @@ impl FromStr for Op {
 
 #[derive(PartialEq,Debug)]
 pub struct Predicate {
-    op: Op,
-    major: u64,
-    minor: Option<u64>,
-    patch: Option<u64>,
-    pre: Vec<Identifier>,
+    pub op: Op,
+    pub major: u64,
+    pub minor: Option<u64>,
+    pub patch: Option<u64>,
+    pub pre: Vec<Identifier>,
 }
 
 pub fn parse(ranges: &str) -> Result<VersionReq, String> {
