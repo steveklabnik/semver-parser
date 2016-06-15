@@ -14,31 +14,33 @@ lazy_static! {
         // * <=
         // * ~
         // * ^
-        let operation = r"=|>|(:?>=)|<|(:?<=)|~|\^";
+        let operation = r"=|>|>=|<|<=|~|\^";
 
         // a numeric identifier is either zero or multiple numbers without a leading zero
-        let numeric_identifier = r"0|(:?[1-9][0-9]*)";
+        let numeric_identifier = r"0|[1-9][0-9]*";
 
         let major = numeric_identifier;
 
         // minor can be either a number or a wildcard. *, x, and X are wildcards.
-        let minor = format!(r"(:?{})|\*|[xX]", numeric_identifier);
+        let minor = format!(r"{}|\*|[xX]", numeric_identifier);
 
         // patch can be either a number or a wildcard. *, x, and X are wildcards.
-        let patch = format!(r"(:?{})|\*|[xX]", numeric_identifier);
+        let patch = format!(r"{}|\*|[xX]", numeric_identifier);
 
         let letters_numbers_dash_dot = r"[-.A-Za-z0-9]+";
 
         // This regex does not fully parse prereleases, just extracts the whole prerelease string.
         // parse_version() will parse this further.
         let pre = letters_numbers_dash_dot;
-        
+
         let regex = format!(r"(?x) # heck yes x mode
+            ^\s*                    # leading whitespace
             (?P<operation>{})?\s*   # optional operation
             (?P<major>{})           # major version
-            (:?\.(?P<minor>{}))?    # optional dot and then minor
-            (:?\.(?P<patch>{}))?    # optional dot and then patch
-            (:?-(?P<pre>{}))?       # optional prerelease version
+            (?:\.(?P<minor>{}))?    # optional dot and then minor
+            (?:\.(?P<patch>{}))?    # optional dot and then patch
+            (?:-(?P<pre>{}))?       # optional prerelease version
+            \s*$                    # trailing whitespace
             ",
             operation,
             major,
@@ -46,12 +48,13 @@ lazy_static! {
             patch,
             pre);
         let regex = Regex::new(&regex);
-        
+
         // this unwrap is okay because everything above here is const, so this will never fail.
         regex.unwrap()
     };
 }
 
+#[derive(Debug)]
 pub struct VersionReq {
     pub predicates: Vec<Predicate>,
 }
@@ -101,18 +104,18 @@ pub struct Predicate {
     pre: Vec<Identifier>,
 }
 
-pub fn parse(range: &str) -> Result<VersionReq, String> {
+pub fn parse(ranges: &str) -> Result<VersionReq, String> {
     // null is an error
-    if range == "\0" {
+    if ranges == "\0" {
         return Err(String::from("Null is not a valid VersionReq"));
     }
-    
+
     // an empty range is a major version wildcard
     // so is a lone * or x of either capitalization
-    if (range == "")
-    || (range == "*")
-    || (range == "x")
-    || (range == "X") {
+    if (ranges == "")
+    || (ranges == "*")
+    || (ranges == "x")
+    || (ranges == "X") {
         return Ok(VersionReq {
             predicates: vec![Predicate {
                 op: Op::Wildcard(WildcardVersion::Major),
@@ -125,14 +128,14 @@ pub fn parse(range: &str) -> Result<VersionReq, String> {
     }
 
 
-    let range = range.trim();
+    let ranges = ranges.trim();
 
-    let predicates: Result<Vec<_>, String> = REGEX.find_iter(range)
-        .map(|pos| {
-            let range = &range[pos.0..pos.1];
-
+    let predicates: Result<Vec<_>, String> = ranges
+        .split(",")
+        .map(|range| {
             parse_predicate(range)
-        }).collect();
+        })
+        .collect();
 
     let predicates = try!(predicates);
 
@@ -166,7 +169,7 @@ pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
                         .unwrap();
 
     let minor = captures.name("minor");
-    
+
     // oh my what have I done? This code is gross.
     let minor = if minor.is_some() {
         let minor = minor.unwrap();
@@ -182,9 +185,9 @@ pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
     } else {
         None
     };
-    
+
     let patch = captures.name("patch");
-    
+
     // oh my what have I done? This code is gross.
     let patch = if patch.is_some() {
         let patch = patch.unwrap();
@@ -672,13 +675,13 @@ mod tests {
     #[test]
     pub fn test_parse_errors() {
         assert!(range::parse("\0").is_err());
-//        assert!(range::parse(">= >= 0.0.2").is_err());
-//        assert!(range::parse(">== 0.0.2").is_err());
-//        assert!(range::parse("a.0.0").is_err());
-//        assert!(range::parse("1.0.0-").is_err());
+        assert!(range::parse(">= >= 0.0.2").is_err());
+        assert!(range::parse(">== 0.0.2").is_err());
+        assert!(range::parse("a.0.0").is_err());
+        assert!(range::parse("1.0.0-").is_err());
         assert!(range::parse(">=").is_err());
-//        assert!(range::parse("> 0.1.0,").is_err());
-//        assert!(range::parse("> 0.3.0, ,").is_err());
+        assert!(range::parse("> 0.1.0,").is_err());
+        assert!(range::parse("> 0.3.0, ,").is_err());
     }
-    
+
 }
