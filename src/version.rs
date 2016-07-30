@@ -109,7 +109,6 @@ impl fmt::Display for Identifier {
 
 #[cfg(test)]
 mod tests {
-    use common::is_alpha_numeric;
     use version;
     use super::*;
 
