@@ -33,6 +33,10 @@ lazy_static! {
         // parse_version() will parse this further.
         let pre = letters_numbers_dash_dot;
 
+        // This regex does not fully parse builds, just extracts the whole build string.
+        // parse_version() will parse this further.
+        let build = letters_numbers_dash_dot;
+
         let regex = format!(r"(?x) # heck yes x mode
             ^\s*                    # leading whitespace
             (?P<operation>{})?\s*   # optional operation
@@ -40,13 +44,15 @@ lazy_static! {
             (?:\.(?P<minor>{}))?    # optional dot and then minor
             (?:\.(?P<patch>{}))?    # optional dot and then patch
             (?:-(?P<pre>{}))?       # optional prerelease version
+            (:?\+(?P<build>{}))?    # optional build metadata
             \s*$                    # trailing whitespace
             ",
             operation,
             major,
             minor,
             patch,
-            pre);
+            pre,
+            build);
         let regex = Regex::new(&regex);
 
         // this unwrap is okay because everything above here is const, so this will never fail.
@@ -670,6 +676,24 @@ mod tests {
             },
             r.predicates[1]
         );
+    }
+
+    #[test]
+    fn test_parse_build_metadata_with_predicate() {
+        assert_eq!(range::parse("^1.2.3+meta").unwrap().predicates[0].op,
+                   Op::Compatible);
+        assert_eq!(range::parse("~1.2.3+meta").unwrap().predicates[0].op,
+                   Op::Tilde);
+        assert_eq!(range::parse("=1.2.3+meta").unwrap().predicates[0].op,
+                   Op::Ex);
+        assert_eq!(range::parse("<=1.2.3+meta").unwrap().predicates[0].op,
+                   Op::LtEq);
+        assert_eq!(range::parse(">=1.2.3+meta").unwrap().predicates[0].op,
+                   Op::GtEq);
+        assert_eq!(range::parse("<1.2.3+meta").unwrap().predicates[0].op,
+                   Op::Lt);
+        assert_eq!(range::parse(">1.2.3+meta").unwrap().predicates[0].op,
+                   Op::Gt);
     }
 
     #[test]
