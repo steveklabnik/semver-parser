@@ -27,8 +27,8 @@ lazy_static! {
             (?P<major>{})           # major version
             \.                      # dot
             (?P<minor>{})           # minor version
-            \.                      # dot
-            (?P<patch>{})           # patch version
+            \.?                     # optional dot
+            (?P<patch>{})?          # optional patch version
             (:?-(?P<pre>{}))?       # optional prerelease version
             (:?\+(?P<build>{}))?    # optional build metadata
             $",
@@ -75,7 +75,7 @@ pub fn parse(version: &str) -> Result<Version, String> {
     Ok(Version {
         major: captures.name("major").unwrap().parse().unwrap(),
         minor: captures.name("minor").unwrap().parse().unwrap(),
-        patch: captures.name("patch").unwrap().parse().unwrap(),
+        patch: captures.name("patch").unwrap_or("0").parse().unwrap(),
         pre: pre,
         build: build,
     })
@@ -143,9 +143,11 @@ mod tests {
     fn parse_no_patch() {
         let version = "1.2";
 
-        let parsed = version::parse(version);
+        let parsed = version::parse(version).unwrap();
 
-        assert!(parsed.is_err(), format!("'{}' incorrectly considered a valid parse", version));
+        assert_eq!(1, parsed.major);
+        assert_eq!(2, parsed.minor);
+        assert_eq!(0, parsed.patch);
     }
 
     #[test]
