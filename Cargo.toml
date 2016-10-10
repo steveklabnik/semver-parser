@@ -5,7 +5,7 @@ authors = ["Steve Klabnik <steve@steveklabnik.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/steveklabnik/semver-parser"
 homepage = "https://github.com/steveklabnik/semver-parser"
-documentation = "http://steveklabnik.github.io/semver-parser"
+documentation = "https://docs.rs/semver-parser"
 description = """
 Parsing of the semver spec
 """
