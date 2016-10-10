@@ -7,7 +7,7 @@ use common;
 lazy_static! {
     static ref REGEX: Regex = {
         // a numeric identifier is either zero or multiple numbers without a leading zero
-        let numeric_identifier = r"0|(:?[1-9][0-9]*)";
+        let numeric_identifier = r"0|(?:[1-9][0-9]*)";
 
         let major = numeric_identifier;
         let minor = numeric_identifier;
@@ -29,8 +29,8 @@ lazy_static! {
             (?P<minor>{})           # minor version
             \.                      # dot
             (?P<patch>{})           # patch version
-            (:?-(?P<pre>{}))?       # optional prerelease version
-            (:?\+(?P<build>{}))?    # optional build metadata
+            (?:-(?P<pre>{}))?       # optional prerelease version
+            (?:\+(?P<build>{}))?    # optional build metadata
             $",
             major,
             minor,

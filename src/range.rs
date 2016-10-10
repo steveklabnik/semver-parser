@@ -44,7 +44,7 @@ lazy_static! {
             (?:\.(?P<minor>{}))?    # optional dot and then minor
             (?:\.(?P<patch>{}))?    # optional dot and then patch
             (?:-(?P<pre>{}))?       # optional prerelease version
-            (:?\+(?P<build>{}))?    # optional build metadata
+            (?:\+(?P<build>{}))?    # optional build metadata
             \s*$                    # trailing whitespace
             ",
             operation,
