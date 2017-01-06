@@ -169,7 +169,7 @@ pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
                                 .map(Result::unwrap)
                                 .unwrap_or(Op::Compatible);
 
-    // first unwrap is okay because we always have major
+    // unwrap is okay because we always have major
     let major: Result<_, ParseIntError> = captures.name("major")
                         .unwrap()
                         .parse();
