@@ -2,6 +2,8 @@ use regex::Regex;
 use common;
 use version::Identifier;
 use std::str::FromStr;
+use std::error::Error;
+use std::num::ParseIntError;
 
 lazy_static! {
     static ref REGEX: Regex = {
@@ -168,11 +170,14 @@ pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
                                 .unwrap_or(Op::Compatible);
 
     // first unwrap is okay because we always have major
-    // second unwrap is okay becasue we know it's a number
-    let major = captures.name("major")
+    let major: Result<_, ParseIntError> = captures.name("major")
                         .unwrap()
-                        .parse()
-                        .unwrap();
+                        .parse();
+
+    let major = match major {
+                            Ok(number) => number,
+                            Err(err) => return Err("Error parsing major version number: ".to_string() + err.description())
+                };
 
     let minor = captures.name("minor");
 
@@ -706,6 +711,11 @@ mod tests {
         assert!(range::parse(">=").is_err());
         assert!(range::parse("> 0.1.0,").is_err());
         assert!(range::parse("> 0.3.0, ,").is_err());
+    }
+    
+    #[test]
+    pub fn test_large_version() {
+        assert!(range::parse("18446744073709551617.0.0").is_err());
     }
 
 }
