@@ -1,66 +1,7 @@
-use regex::Regex;
-use common;
+use common::{self, numeric_identifier, letters_numbers_dash_dot};
 use version::Identifier;
-use std::str::FromStr;
-use std::error::Error;
-use std::num::ParseIntError;
-
-lazy_static! {
-    static ref REGEX: Regex = {
-        // an operation can be:
-        //
-        // * =
-        // * >
-        // * >=
-        // * <
-        // * <=
-        // * ~
-        // * ^
-        let operation = r"=|>|>=|<|<=|~|\^";
-
-        // a numeric identifier is either zero or multiple numbers without a leading zero
-        let numeric_identifier = r"0|[1-9][0-9]*";
-
-        let major = numeric_identifier;
-
-        // minor can be either a number or a wildcard. *, x, and X are wildcards.
-        let minor = format!(r"{}|\*|[xX]", numeric_identifier);
-
-        // patch can be either a number or a wildcard. *, x, and X are wildcards.
-        let patch = format!(r"{}|\*|[xX]", numeric_identifier);
-
-        let letters_numbers_dash_dot = r"[-.A-Za-z0-9]+";
-
-        // This regex does not fully parse prereleases, just extracts the whole prerelease string.
-        // parse_version() will parse this further.
-        let pre = letters_numbers_dash_dot;
-
-        // This regex does not fully parse builds, just extracts the whole build string.
-        // parse_version() will parse this further.
-        let build = letters_numbers_dash_dot;
-
-        let regex = format!(r"(?x) # heck yes x mode
-            ^\s*                    # leading whitespace
-            (?P<operation>{})?\s*   # optional operation
-            (?P<major>{})           # major version
-            (?:\.(?P<minor>{}))?    # optional dot and then minor
-            (?:\.(?P<patch>{}))?    # optional dot and then patch
-            (?:-(?P<pre>{}))?       # optional prerelease version
-            (?:\+(?P<build>{}))?    # optional build metadata
-            \s*$                    # trailing whitespace
-            ",
-            operation,
-            major,
-            minor,
-            patch,
-            pre,
-            build);
-        let regex = Regex::new(&regex);
-
-        // this unwrap is okay because everything above here is const, so this will never fail.
-        regex.unwrap()
-    };
-}
+use std::str::{FromStr, from_utf8};
+use recognize::*;
 
 #[derive(Debug)]
 pub struct VersionReq {
@@ -112,6 +53,101 @@ pub struct Predicate {
     pub pre: Vec<Identifier>,
 }
 
+fn numeric_or_wild(s: &[u8]) -> Option<(Option<u64>, usize)> {
+    if let Some((val, len)) = numeric_identifier(s) {
+        Some((Some(val), len))
+    } else if let Some(len) = OneOf(b"*xX").p(s) {
+        Some((None, len))
+    } else {
+        None
+    }
+}
+
+fn dot_numeric_or_wild(s: &[u8]) -> Option<(Option<u64>, usize)> {
+    b'.'.p(s).and_then(|len|
+        numeric_or_wild(&s[len..]).map(|(val, len2)| (val, len + len2))
+    )
+}
+
+fn operation(s: &[u8]) -> Option<(Op, usize)> {
+    if let Some(len) = "=".p(s) {
+        Some((Op::Ex, len))
+    } else if let Some(len) = ">=".p(s) {
+        Some((Op::GtEq, len))
+    } else if let Some(len) = ">".p(s) {
+        Some((Op::Gt, len))
+    } else if let Some(len) = "<=".p(s) {
+        Some((Op::LtEq, len))
+    } else if let Some(len) = "<".p(s) {
+        Some((Op::Lt, len))
+    } else if let Some(len) = "~".p(s) {
+        Some((Op::Tilde, len))
+    } else if let Some(len) = "^".p(s) {
+        Some((Op::Compatible, len))
+    } else {
+        None
+    }
+}
+
+fn whitespace(s: &[u8]) -> Option<usize> {
+    ZeroOrMore(OneOf(b"\t\r\n ")).p(s)
+}
+
+pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
+    let s = range.trim().as_bytes();
+    let mut i = 0;
+    let mut operation = if let Some((op, len)) = operation(&s[i..]) {
+        i += len;
+        op
+    } else {
+        // operations default to Compatible
+        Op::Compatible
+    };
+    if let Some(len) = whitespace.p(&s[i..]) {
+        i += len;
+    }
+    let major = if let Some((major, len)) = numeric_identifier(&s[i..]) {
+        i += len;
+        major
+    } else {
+        return Err("Error parsing major version number: ".to_string());
+    };
+    let minor = if let Some((minor, len)) = dot_numeric_or_wild(&s[i..]) {
+        i += len;
+        if minor.is_none() {
+            operation = Op::Wildcard(WildcardVersion::Minor);
+        }
+        minor
+    } else {
+        None
+    };
+    let patch = if let Some((patch, len)) = dot_numeric_or_wild(&s[i..]) {
+        i += len;
+        if patch.is_none() {
+            operation = Op::Wildcard(WildcardVersion::Patch);
+        }
+        patch
+    } else {
+        None
+    };
+    let (pre, pre_len) = common::parse_optional_meta(&s[i..], b'-')?;
+    i += pre_len;
+    if let Some(len) = (b'+', letters_numbers_dash_dot).p(&s[i..]) {
+        i += len;
+    }
+    if i != s.len() {
+        return Err("Extra junk after valid predicate: ".to_string() +
+            from_utf8(&s[i..]).unwrap());
+    }
+    Ok(Predicate {
+        op: operation,
+        major: major,
+        minor: minor,
+        patch: patch,
+        pre: pre,
+    })
+}
+
 pub fn parse(ranges: &str) -> Result<VersionReq, String> {
     // null is an error
     if ranges == "\0" {
@@ -156,75 +192,6 @@ pub fn parse(ranges: &str) -> Result<VersionReq, String> {
     })
 }
 
-pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
-    let captures = match REGEX.captures(range.trim()) {
-        Some(captures) => captures,
-        None => return Err(From::from("VersionReq did not parse properly.")),
-    };
-
-    // operations default to Compatible
-    // unwrap is okay because we validate that we only have correct strings in the regex
-    let mut operation = captures.name("operation")
-                                .map(str::parse)
-                                .map(Result::unwrap)
-                                .unwrap_or(Op::Compatible);
-
-    // unwrap is okay because we always have major
-    let major: Result<_, ParseIntError> = captures.name("major")
-                        .unwrap()
-                        .parse();
-
-    let major = match major {
-                            Ok(number) => number,
-                            Err(err) => return Err("Error parsing major version number: ".to_string() + err.description())
-                };
-
-    let minor = captures.name("minor");
-
-    // oh my what have I done? This code is gross.
-    let minor = if minor.is_some() {
-        let minor = minor.unwrap();
-        match minor.parse() {
-            Ok(number) => Some(number),
-            Err(_) => {
-                // if we get an error, it's because it's a wildcard
-                operation = Op::Wildcard(WildcardVersion::Minor);
-
-                None
-            },
-        }
-    } else {
-        None
-    };
-
-    let patch = captures.name("patch");
-
-    // oh my what have I done? This code is gross.
-    let patch = if patch.is_some() {
-        let patch = patch.unwrap();
-        match patch.parse() {
-            Ok(number) => Some(number),
-            Err(_) => {
-                // if we get an error, it's because it's a wildcard
-                operation = Op::Wildcard(WildcardVersion::Patch);
-
-                None
-            },
-        }
-    } else {
-        None
-    };
-
-    let pre = captures.name("pre").map(common::parse_meta).unwrap_or_else(Vec::new);
-
-    Ok(Predicate {
-        op: operation,
-        major: major,
-        minor: minor,
-        patch: patch,
-        pre: pre,
-    })
-}
 
 #[cfg(test)]
 mod tests {
