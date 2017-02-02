@@ -179,40 +179,40 @@ pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
                             Err(err) => return Err("Error parsing major version number: ".to_string() + err.description())
                 };
 
-    let minor = captures.name("minor");
-
-    // oh my what have I done? This code is gross.
-    let minor = if minor.is_some() {
-        let minor = minor.unwrap();
-        match minor.parse() {
-            Ok(number) => Some(number),
-            Err(_) => {
-                // if we get an error, it's because it's a wildcard
-                operation = Op::Wildcard(WildcardVersion::Minor);
-
-                None
-            },
-        }
-    } else {
-        None
+    let minor = match captures.name("minor") {
+        Some(minor) => {
+            match minor.parse::<u64>() {
+                Ok(number) => Some(number),
+                Err(err) => {
+                    match minor {
+                        "*" | "x" | "X"  => {
+                            operation = Op::Wildcard(WildcardVersion::Minor);
+                            None
+                        },
+                        _ => return Err("Error parsing minor version number: ".to_string() + err.description()),
+                    }
+                },
+            }
+        },
+        None => None,
     };
 
-    let patch = captures.name("patch");
-
-    // oh my what have I done? This code is gross.
-    let patch = if patch.is_some() {
-        let patch = patch.unwrap();
-        match patch.parse() {
-            Ok(number) => Some(number),
-            Err(_) => {
-                // if we get an error, it's because it's a wildcard
-                operation = Op::Wildcard(WildcardVersion::Patch);
-
-                None
-            },
-        }
-    } else {
-        None
+    let patch = match captures.name("patch") {
+        Some(patch) => {
+            match patch.parse::<u64>() {
+                Ok(number) => Some(number),
+                Err(err) => {
+                    match patch {
+                        "*" | "x" | "X"  => {
+                            operation = Op::Wildcard(WildcardVersion::Patch);
+                            None
+                        },
+                        _ => return Err("Error parsing patch version number: ".to_string() + err.description()),
+                    }
+                },
+            }
+        },
+        None => None,
     };
 
     let pre = captures.name("pre").map(common::parse_meta).unwrap_or_else(Vec::new);
@@ -712,10 +712,19 @@ mod tests {
         assert!(range::parse("> 0.1.0,").is_err());
         assert!(range::parse("> 0.3.0, ,").is_err());
     }
-    
+
     #[test]
-    pub fn test_large_version() {
+    pub fn test_large_major_version() {
         assert!(range::parse("18446744073709551617.0.0").is_err());
     }
 
+    #[test]
+    pub fn test_large_minor_version() {
+        assert!(range::parse("0.18446744073709551617.0").is_err());
+    }
+
+    #[test]
+    pub fn test_large_patch_version() {
+        assert!(range::parse("0.0.18446744073709551617").is_err());
+    }
 }
