@@ -192,7 +192,6 @@ pub fn parse(ranges: &str) -> Result<VersionReq, String> {
     })
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -679,10 +678,19 @@ mod tests {
         assert!(range::parse("> 0.1.0,").is_err());
         assert!(range::parse("> 0.3.0, ,").is_err());
     }
-    
+
     #[test]
-    pub fn test_large_version() {
+    pub fn test_large_major_version() {
         assert!(range::parse("18446744073709551617.0.0").is_err());
     }
 
+    #[test]
+    pub fn test_large_minor_version() {
+        assert!(range::parse("0.18446744073709551617.0").is_err());
+    }
+
+    #[test]
+    pub fn test_large_patch_version() {
+        assert!(range::parse("0.0.18446744073709551617").is_err());
+    }
 }
