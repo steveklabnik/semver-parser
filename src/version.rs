@@ -1,48 +1,9 @@
 use std::fmt;
+use std::str::from_utf8;
 
-use regex::Regex;
+use recognize::*;
 
-use common;
-
-lazy_static! {
-    static ref REGEX: Regex = {
-        // a numeric identifier is either zero or multiple numbers without a leading zero
-        let numeric_identifier = r"0|(?:[1-9][0-9]*)";
-
-        let major = numeric_identifier;
-        let minor = numeric_identifier;
-        let patch = numeric_identifier;
-
-        let letters_numbers_dash_dot = r"[-.A-Za-z0-9]+";
-
-        // This regex does not fully parse prereleases, just extracts the whole prerelease string.
-        // parse_version() will parse this further.
-        let pre = letters_numbers_dash_dot;
-
-        // This regex does not fully parse builds, just extracts the whole build string.
-        // parse_version() will parse this further.
-        let build = letters_numbers_dash_dot;
-
-        let regex = format!(r"^(?x) # heck yes x mode
-            (?P<major>{})           # major version
-            \.                      # dot
-            (?P<minor>{})           # minor version
-            \.                      # dot
-            (?P<patch>{})           # patch version
-            (?:-(?P<pre>{}))?       # optional prerelease version
-            (?:\+(?P<build>{}))?    # optional build metadata
-            $",
-            major,
-            minor,
-            patch,
-            pre,
-            build);
-        let regex = Regex::new(&regex);
-
-        // this unwrap is okay because everything above here is const, so this will never fail.
-        regex.unwrap()
-    };
-}
+use common::{self, numeric_identifier};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Version {
@@ -62,20 +23,48 @@ pub enum Identifier {
 }
 
 pub fn parse(version: &str) -> Result<Version, String> {
-    let captures = match REGEX.captures(version.trim()) {
-        Some(captures) => captures,
-        None => return Err(From::from("Version did not parse properly.")),
+    let s = version.trim().as_bytes();
+    let mut i = 0;
+    let major = if let Some((major, len)) = numeric_identifier(&s[i..]) {
+        i += len;
+        major
+    } else {
+        return Err("Error parsing major identifier".to_string());
     };
-
-    let pre =
-        captures.name("pre").map(common::parse_meta).unwrap_or(vec![]);
-    let build =
-        captures.name("build").map(common::parse_meta).unwrap_or(vec![]);
-
+    if let Some(len) = b'.'.p(&s[i..]) {
+        i += len;
+    } else {
+        return Err("Expected dot".to_string());
+    }
+    let minor = if let Some((minor, len)) = numeric_identifier(&s[i..]) {
+        i += len;
+        minor
+    } else {
+        return Err("Error parsing minor identifier".to_string());
+    };
+    if let Some(len) = b'.'.p(&s[i..]) {
+        i += len;
+    } else {
+        return Err("Expected dot".to_string());
+    }
+    let patch = if let Some((patch, len)) = numeric_identifier(&s[i..]) {
+        i += len;
+        patch
+    } else {
+        return Err("Error parsing patch identifier".to_string());
+    };
+    let (pre, pre_len) = common::parse_optional_meta(&s[i..], b'-')?;
+    i += pre_len;
+    let (build, build_len) = common::parse_optional_meta(&s[i..], b'+')?;
+    i += build_len;
+    if i != s.len() {
+        return Err("Extra junk after valid version: ".to_string() +
+            from_utf8(&s[i..]).unwrap());
+    }
     Ok(Version {
-        major: captures.name("major").unwrap().parse().unwrap(),
-        minor: captures.name("minor").unwrap().parse().unwrap(),
-        patch: captures.name("patch").unwrap().parse().unwrap(),
+        major: major,
+        minor: minor,
+        patch: patch,
         pre: pre,
         build: build,
     })
@@ -225,6 +214,33 @@ mod tests {
     }
 
     #[test]
+    fn parse_no_major_overflow() {
+        let version = "98765432109876543210.0.0";
+
+        let parsed = version::parse(version);
+
+        assert!(parsed.is_err(), "98765432109876543210 incorrectly considered a valid major version");
+    }
+
+    #[test]
+    fn parse_no_minor_overflow() {
+        let version = "0.98765432109876543210.0";
+
+        let parsed = version::parse(version);
+
+        assert!(parsed.is_err(), "98765432109876543210 incorrectly considered a valid minor version");
+    }
+
+    #[test]
+    fn parse_no_patch_overflow() {
+        let version = "0.0.98765432109876543210";
+
+        let parsed = version::parse(version);
+
+        assert!(parsed.is_err(), "98765432109876543210 incorrectly considered a valid patch version");
+    }
+
+    #[test]
     fn parse_basic_prerelease() {
         let version = "1.2.3-pre";
 
@@ -316,6 +332,20 @@ mod tests {
         assert_eq!(expected_pre, parsed.pre);
 
         let expected_build = vec![Identifier::AlphaNumeric(String::from("0851523"))];
+        assert_eq!(expected_build, parsed.build);
+    }
+
+    #[test]
+    fn parse_metadata_overflow() {
+        let version = "0.4.0-beta.1+98765432109876543210";
+
+        let parsed = version::parse(version).unwrap();
+
+        let expected_pre = vec![Identifier::AlphaNumeric(String::from("beta")),
+                                Identifier::Numeric(1)];
+        assert_eq!(expected_pre, parsed.pre);
+
+        let expected_build = vec![Identifier::AlphaNumeric(String::from("98765432109876543210"))];
         assert_eq!(expected_build, parsed.build);
     }
 
