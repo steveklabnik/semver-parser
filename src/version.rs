@@ -34,6 +34,15 @@ pub fn parse(version: &str) -> Result<Version, String> {
     if let Some(len) = b'.'.p(&s[i..]) {
         i += len;
     } else {
+        if i == s.len() {
+            return Ok(Version {
+                major: major,
+                minor: 0,
+                patch: 0,
+                pre: vec![],
+                build: vec![],
+            });
+        }
         return Err("Expected dot".to_string());
     }
     let minor = if let Some((minor, len)) = numeric_identifier(&s[i..]) {
@@ -45,6 +54,15 @@ pub fn parse(version: &str) -> Result<Version, String> {
     if let Some(len) = b'.'.p(&s[i..]) {
         i += len;
     } else {
+        if i == s.len() {
+            return Ok(Version {
+                major: major,
+                minor: minor,
+                patch: 0,
+                pre: vec![],
+                build: vec![],
+            });
+        }
         return Err("Expected dot".to_string());
     }
     let patch = if let Some((patch, len)) = numeric_identifier(&s[i..]) {
@@ -123,18 +141,22 @@ mod tests {
     fn parse_no_minor_patch() {
         let version = "1";
 
-        let parsed = version::parse(version);
+        let parsed = version::parse(version).unwrap();
 
-        assert!(parsed.is_err(), format!("'{}' incorrectly considered a valid parse", version));
+        assert_eq!(1, parsed.major);
+        assert_eq!(0, parsed.minor);
+        assert_eq!(0, parsed.patch);
     }
 
     #[test]
     fn parse_no_patch() {
         let version = "1.2";
 
-        let parsed = version::parse(version);
+        let parsed = version::parse(version).unwrap();
 
-        assert!(parsed.is_err(), format!("'{}' incorrectly considered a valid parse", version));
+        assert_eq!(1, parsed.major);
+        assert_eq!(2, parsed.minor);
+        assert_eq!(0, parsed.patch);
     }
 
     #[test]
