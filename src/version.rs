@@ -63,13 +63,18 @@ pub fn parse(version: &str) -> Result<Version, String> {
                 build: vec![],
             });
         }
-        return Err("Expected dot".to_string());
+        if s[i] != b'-' && s[i] != b'+' {
+            return Err("Expected dot".to_string());
+        }
     }
     let patch = if let Some((patch, len)) = numeric_identifier(&s[i..]) {
         i += len;
         patch
     } else {
-        return Err("Error parsing patch identifier".to_string());
+        if s[i] != b'-' && s[i] != b'+' {
+            return Err("Error parsing patch identifier".to_string());
+        }
+        0
     };
     let (pre, pre_len) = common::parse_optional_meta(&s[i..], b'-')?;
     i += pre_len;
@@ -294,6 +299,29 @@ mod tests {
     }
 
     #[test]
+    fn parse_pre_on_minor() {
+        let version = "1.2-beta";
+
+        let parsed = version::parse(version).unwrap();
+
+        assert_eq!(1, parsed.major);
+        assert_eq!(2, parsed.minor);
+        assert_eq!(0, parsed.patch);
+
+        let expected_pre = vec![Identifier::AlphaNumeric(String::from("beta"))];
+        assert_eq!(expected_pre, parsed.pre);
+    }
+
+    #[test]
+    fn parse_pre_on_major() {
+        let version = "1-beta";
+
+        let parsed = version::parse(version);
+
+        assert!(parsed.is_err(), "1-beta incorrectly considered a valid major version");
+    }
+
+    #[test]
     fn parse_basic_build() {
         let version = "1.2.3+build";
 
@@ -383,5 +411,28 @@ mod tests {
 
         let expected_pre = vec![Identifier::AlphaNumeric(String::from("WIP"))];
         assert_eq!(expected_pre, parsed.pre);
+    }
+
+    #[test]
+    fn parse_build_on_minor() {
+        let version = "1.2+build";
+
+        let parsed = version::parse(version).unwrap();
+
+        assert_eq!(1, parsed.major);
+        assert_eq!(2, parsed.minor);
+        assert_eq!(0, parsed.patch);
+
+        let expected_build = vec![Identifier::AlphaNumeric(String::from("build"))];
+        assert_eq!(expected_build, parsed.build);
+    }
+
+    #[test]
+    fn parse_build_on_major() {
+        let version = "1+build";
+
+        let parsed = version::parse(version);
+
+        assert!(parsed.is_err(), "1+build incorrectly considered a valid major version");
     }
 }
