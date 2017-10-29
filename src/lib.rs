@@ -46,6 +46,9 @@
 //! [`version::Version`]: ./version/struct.Version.html
 //! [`range::Predicate`]: ./range/struct.Predicate.html
 //! [`range::VersionReq`]: ./range/struct.VersionReq.html
+
+#![doc(html_root_url = "https://docs.rs/semver-parser/0.8.0")]
+
 pub mod version;
 pub mod range;
 
