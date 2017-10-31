@@ -1,3 +1,35 @@
+//! Version data and functions
+//!
+//! This module contains [`Version`] struct, [`parse`] function for building
+//! [`Version`] struct from string and some helper data structures and functions.
+//!
+//! # Examples
+//!
+//! Parsing `Version` from string and checking its fields:
+//!
+//! ```rust
+//! use semver_parser::version;
+//!
+//! # fn try_main() -> Result<(), String> {
+//!
+//! let version = version::parse("1.2.3-alpha1")?;
+//! assert_eq!(version.major, 1);
+//! assert_eq!(version.minor, 2);
+//! assert_eq!(version.patch, 3);
+//! let expected_pre =
+//! vec![semver_parser::version::Identifier::AlphaNumeric(String::from("alpha1"))];
+//! assert_eq!(expected_pre, version.pre);
+//!
+//! # Ok(())
+//! # }
+//! #
+//! # fn main() {
+//! #   try_main().unwrap();
+//! # }
+//! ```
+//! [`Version`]: ./struct.Version.html
+//! [`parse`]: ./fn.parse.html
+
 use std::fmt;
 use std::str::from_utf8;
 
@@ -5,15 +37,72 @@ use recognize::*;
 
 use common::{self, numeric_identifier};
 
+/// Structure representing version data
+///
+/// `Version` struct has some public fields representing version data, like major/minor version
+/// string, patch number and vectors of prefix and build identifiers.
+///
+/// # Examples
+///
+/// Parsing `Version` from string and checking its fields:
+///
+/// ```rust
+/// use semver_parser::version;
+///
+/// # fn try_main() -> Result<(), String> {
+///
+/// let version = version::parse("0.1.2-alpha1")?;
+/// assert_eq!(version.major, 0);
+/// assert_eq!(version.minor, 1);
+/// assert_eq!(version.patch, 2);
+/// let expected_pre = vec![version::Identifier::AlphaNumeric(String::from("alpha1"))];
+/// assert_eq!(expected_pre, version.pre);
+/// # Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #   try_main().unwrap();
+/// # }
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Version {
+    /// major version as number (`0` in `"0.1.2"`);
     pub major: u64,
+    /// minor version as number (`1` in `"0.1.2"`);
     pub minor: u64,
+    /// patch version as number (`2` in `"0.1.2"`);
     pub patch: u64,
+    /// pre-release metadata as a vector of `Identifier` (`"alpha1"` in `"0.1.2-alpha1"` or `7` (numeric) in `"0.1.2-7"`, `"pre"` and `0` (numeric) in `"0.1.2-pre.0"`);
     pub pre: Vec<Identifier>,
+    /// build metadata as a vector of `Identifier` (`"build1"` in `"0.1.2+build1"` or `7` (numeric) in `"0.1.2+7"`, `"build"` and `0` (numeric) in `"0.1.2+pre.0"`);
     pub build: Vec<Identifier>,
 }
 
+/// Helper enum for holding data of alpanumeric or numeric suffix identifiers
+///
+/// This enum is used to hold suffix parts of `pre` and `build` fields of
+/// [`Version`] struct. Theses suffixes may be either numeric or alphanumeric.
+///
+/// # Examples
+///
+/// Parsing [`Version`] with pre-release part composed of two `Identifier`s:
+///
+/// ```rust
+/// use semver_parser::version::Identifier;
+///
+/// # fn try_main() -> Result<(), String> {
+///
+/// let version = semver_parser::version::parse("0.1.2-alpha1.0")?;
+/// let expected_pre = vec![Identifier::AlphaNumeric(String::from("alpha1")), Identifier::Numeric(0)];
+/// assert_eq!(expected_pre, version.pre);
+/// # Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #   try_main().unwrap();
+/// # }
+/// ```
+/// [`Version`]: ./struct.Version.html
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Identifier {
     /// An identifier that's solely numbers.
@@ -22,6 +111,35 @@ pub enum Identifier {
     AlphaNumeric(String),
 }
 
+/// Function for parsing version string to [`Version`]
+///
+/// Returns `Result<`[`Version`]`, String>`, where `String` represents an error while parsing.
+///
+/// # Examples
+///
+/// Parsing [`Version`] from string and checking its fields:
+///
+/// ```rust
+/// use semver_parser::version;
+///
+/// # fn try_main() -> Result<(), String> {
+///
+/// let version = version::parse("0.1.2-alpha1")?;
+/// assert_eq!(version.major, 0);
+/// assert_eq!(version.minor, 1);
+/// assert_eq!(version.patch, 2);
+/// let expected_pre =
+/// vec![version::Identifier::AlphaNumeric(String::from("alpha1"))];
+/// assert_eq!(expected_pre, version.pre);
+///
+/// # Ok(())
+/// # }
+/// #
+/// # fn main() {
+/// #   try_main().unwrap();
+/// # }
+/// ```
+/// [`Version`]: ./struct.Version.html
 pub fn parse(version: &str) -> Result<Version, String> {
     let s = version.trim().as_bytes();
     let mut i = 0;
