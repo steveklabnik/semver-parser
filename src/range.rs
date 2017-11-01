@@ -8,14 +8,14 @@ pub struct VersionReq {
     pub predicates: Vec<Predicate>,
 }
 
-#[derive(PartialEq,Debug)]
+#[derive(PartialOrd,PartialEq,Debug)]
 pub enum WildcardVersion {
     Major,
     Minor,
     Patch,
 }
 
-#[derive(PartialEq,Debug)]
+#[derive(PartialOrd,PartialEq,Debug)]
 pub enum Op {
     Ex, // Exact
     Gt, // Greater than
@@ -692,5 +692,66 @@ mod tests {
     #[test]
     pub fn test_large_patch_version() {
         assert!(range::parse("0.0.18446744073709551617").is_err());
+    }
+
+    #[test]
+    pub fn test_op_partialord_lt() {
+        let expect_less = Op::Ex;
+        let other = Op::Gt;
+        assert!(expect_less.lt(&other));
+    }
+
+    #[test]
+    pub fn test_op_partialord_le() {
+        let strictly_lt = Op::Ex;
+        let other = Op::Lt;
+        assert!(strictly_lt.le(&other));
+        assert!(other.le(&other));
+    }
+
+    #[test]
+    pub fn test_op_partialord_gt() {
+        let expect_gt = Op::Compatible;
+        let other = Op::GtEq;
+        assert!(expect_gt.gt(&other));
+    }
+
+    #[test]
+    pub fn test_op_partialord_ge() {
+        let strictly_gt = Op::Compatible;
+        let other = Op::Tilde;
+        assert!(strictly_gt.ge(&other));
+        assert!(other.ge(&other));
+    }
+
+    #[test]
+    pub fn test_wildcard_partialord_lt() {
+        let expect_less = WildcardVersion::Major;
+        let other = WildcardVersion::Minor;
+        assert!(expect_less.lt(&other));
+    }
+
+
+    #[test]
+    pub fn test_wildcard_partialord_le() {
+        let strictly_lt = WildcardVersion::Minor;
+        let other = WildcardVersion::Patch;
+        assert!(strictly_lt.le(&other));
+        assert!(other.le(&other));
+    }
+
+    #[test]
+    pub fn test_wildcard_partialord_gt() {
+        let expect_greater = WildcardVersion::Patch;
+        let other = WildcardVersion::Minor;
+        assert!(expect_greater.gt(&other));
+    }
+
+    #[test]
+    pub fn test_wildcard_partialord_ge() {
+        let strictly_gt = WildcardVersion::Minor;
+        let other = WildcardVersion::Major;
+        assert!(strictly_gt.ge(&other));
+        assert!(other.ge(&other));
     }
 }
