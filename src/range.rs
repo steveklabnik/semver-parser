@@ -1,6 +1,6 @@
-//! Version range and requirements data and functions (used for version comparision)
+//! Version range and requirements data and functions (used for version comparison).
 //!
-//! This module contains [`Predicate`] struct which holds data for comparision
+//! This module contains [`Predicate`] struct which holds data for comparison
 //! [`version::Version`] structs: [`VersionReq`] struct as a collection of
 //! [`Predicate`]s, functions for parsing those structs and some helper data structures
 //! and functions.
@@ -9,12 +9,11 @@
 //!
 //! Parsing version range and matching it with concrete version:
 //!
-//! ```rust
+//! ```
 //! use semver_parser::range;
 //! use semver_parser::version;
 //!
 //! # fn try_main() -> Result<(), String> {
-//!
 //! let r = range::parse("1.0.0")?;
 //!
 //! assert_eq!(range::Predicate {
@@ -38,7 +37,6 @@
 //!         }
 //!     }
 //! }
-//!
 //! # Ok(())
 //! # }
 //! #
@@ -55,7 +53,7 @@ use version::Identifier;
 use std::str::{FromStr, from_utf8};
 use recognize::*;
 
-/// Struct holding collection of version requirements
+/// Struct holding collection of version requirements.
 ///
 /// High-level collection of requirements for versions. Requirements are [`Predicate`] structs.
 ///
@@ -63,11 +61,10 @@ use recognize::*;
 ///
 /// Simple single-predicate `VersionReq`:
 ///
-/// ```rust
+/// ```
 /// use semver_parser::range;
 ///
 /// # fn try_main() -> Result<(), String> {
-///
 /// let r = range::parse("1.0.0")?;
 ///
 /// assert_eq!(range::Predicate {
@@ -89,11 +86,10 @@ use recognize::*;
 ///
 /// Multiple predicates in `VersionReq`:
 ///
-/// ```rust
+/// ```
 /// use semver_parser::range;
 ///
 /// # fn try_main() -> Result<(), String> {
-///
 /// let r = range::parse("> 0.0.9, <= 2.5.3")?;
 ///
 /// assert_eq!(range::Predicate {
@@ -124,11 +120,11 @@ use recognize::*;
 /// [`Predicate`]: ./struct.Predicate.html
 #[derive(Debug)]
 pub struct VersionReq {
-    /// Collection of predicates
+    /// Collection of predicates.
     pub predicates: Vec<Predicate>,
 }
 
-/// Enum representing a `*` version part
+/// Enum representing a `*` version part.
 ///
 /// This is one of variants of the [`Op`] enum wich is part of [`Predicate`] enum.
 /// All variants represent some "match-all" cases for specific numeric parts of version.
@@ -137,11 +133,10 @@ pub struct VersionReq {
 ///
 /// Parsing wildcard predicate and checking that its `op` is `WildcardVersion::Major`:
 ///
-/// ```rust
+/// ```
 /// use semver_parser::range;
 ///
 /// # fn try_main() -> Result<(), String> {
-///
 /// let r = range::parse("*")?;
 ///
 /// assert_eq!(range::Predicate {
@@ -164,15 +159,15 @@ pub struct VersionReq {
 /// [`Predicate`]: ./struct.Predicate.html
 #[derive(PartialEq,Debug)]
 pub enum WildcardVersion {
-    /// Wildcard major version `*.2.3`
+    /// Wildcard major version `*.2.3`.
     Major,
-    /// Wildcard minor version `1.*.3`
+    /// Wildcard minor version `1.*.3`.
     Minor,
-    /// Wildcard patch version `1.2.*`
+    /// Wildcard patch version `1.2.*`.
     Patch,
 }
 
-/// Enum representing operation in [`Predicate`]
+/// Enum representing operation in [`Predicate`].
 ///
 /// This enum represents an operation for comparing two [`version::Version`]s.
 ///
@@ -180,12 +175,11 @@ pub enum WildcardVersion {
 ///
 /// Parsing `Op` from string:
 ///
-/// ```rust
+/// ```
 /// use semver_parser::range;
 /// use std::str::FromStr;
-/// #
-/// # fn try_main() -> Result<(), String> {
 ///
+/// # fn try_main() -> Result<(), String> {
 /// let exact = range::Op::from_str("=")?;
 /// assert_eq!(exact, range::Op::Ex);
 /// let gt_eq = range::Op::from_str(">=")?;
@@ -201,21 +195,23 @@ pub enum WildcardVersion {
 /// [`version::Version`]: ../version/struct.Version.html
 #[derive(PartialEq,Debug)]
 pub enum Op {
-    /// Exact, `=`
+    /// Exact, `=`.
     Ex,
-    /// Greater than, `>`
+    /// Greater than, `>`.
     Gt,
-    /// Greater than or equal to, `>=`
+    /// Greater than or equal to, `>=`.
     GtEq,
-    /// Less than, `<`
+    /// Less than, `<`.
     Lt,
-    /// Less than or equal to, `<=`
+    /// Less than or equal to, `<=`.
     LtEq,
-    /// e.g. `~1.0.0`
+    /// [Tilde](http://doc.crates.io/specifying-dependencies.html#tilde-requirements)
+    /// requirements, like `~1.0.0` - a minimal version with some ability to update.
     Tilde,
-    /// compatible by definition of semver, indicated by `^`
+    /// [Compatible](http://doc.crates.io/specifying-dependencies.html#caret-requirements)
+    /// by definition of semver, indicated by `^`.
     Compatible,
-    /// `x.y.*`, `x.*`, `*`
+    /// `x.y.*`, `x.*`, `*`.
     Wildcard(WildcardVersion),
 }
 
@@ -236,26 +232,24 @@ impl FromStr for Op {
     }
 }
 
-/// Struct representing a version comparision predicate.
+/// Struct representing a version comparison predicate.
 ///
-/// Struct contaions operation code and data for comparision of [`version::Version`]s.
+/// Struct contaions operation code and data for comparison of [`version::Version`]s.
 ///
 /// # Examples
 ///
 /// Parsing [`Predicate`] from string and checking its fields:
 ///
-/// ```rust
+/// ```
 /// use semver_parser::range;
 ///
 /// # fn try_main() -> Result<(), String> {
-///
 /// let p = range::parse_predicate(">=1.1")?;
 /// assert_eq!(p.op, range::Op::GtEq);
 /// assert_eq!(p.major, 1);
 /// assert_eq!(p.minor.unwrap(), 1);
 /// assert!(p.patch.is_none());
 /// assert!(p.pre.is_empty());
-///
 /// # Ok(())
 /// # }
 /// #
@@ -267,15 +261,15 @@ impl FromStr for Op {
 /// [`version::Version`]: ../version/struct.Version.html
 #[derive(PartialEq,Debug)]
 pub struct Predicate {
-    /// Operation code for this predicate, like "greater than" or "exact match"
+    /// Operation code for this predicate, like "greater than" or "exact match".
     pub op: Op,
-    /// Major version
+    /// Major version.
     pub major: u64,
-    /// Optional minor version
+    /// Optional minor version.
     pub minor: Option<u64>,
-    /// Optional patch version
+    /// Optional patch version.
     pub patch: Option<u64>,
-    /// Collection of `Identifier`s of version, like `"alpha1"` in `"1.2.3-alpha1"`
+    /// Collection of `Identifier`s of version, like `"alpha1"` in `"1.2.3-alpha1"`.
     pub pre: Vec<Identifier>,
 }
 
@@ -319,7 +313,7 @@ fn whitespace(s: &[u8]) -> Option<usize> {
     ZeroOrMore(OneOf(b"\t\r\n ")).p(s)
 }
 
-/// Function parsing [`Predicate`] from string
+/// Function parsing [`Predicate`] from string.
 ///
 /// Function parsing [`Predicate`] from string to `Result<`[`Predicate`]`, String>`,
 /// where `Err` will contain error message in case of failed parsing.
@@ -328,11 +322,10 @@ fn whitespace(s: &[u8]) -> Option<usize> {
 ///
 /// Parsing [`Predicate`] from string and cheking its fields:
 ///
-/// ```rust
+/// ```
 /// use semver_parser::range;
 ///
 /// # fn try_main() -> Result<(), String> {
-///
 /// let p = range::parse_predicate(">=1.1")?;
 /// assert_eq!(p.op, range::Op::GtEq);
 /// assert_eq!(p.major, 1);
@@ -342,7 +335,6 @@ fn whitespace(s: &[u8]) -> Option<usize> {
 ///
 /// let f = range::parse_predicate("not-a-version-predicate");
 /// assert!(f.is_err());
-///
 /// # Ok(())
 /// # }
 /// #
@@ -406,7 +398,7 @@ pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
     })
 }
 
-/// Function for parsing [`VersionReq`] from string
+/// Function for parsing [`VersionReq`] from string.
 ///
 /// Function for parsing [`VersionReq`] from string to `Result<`[`VersionReq`]`, String>`,
 /// where `Err` will contain error message in case of failed parsing.
@@ -415,11 +407,10 @@ pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
 ///
 /// Simple single-predicate [`VersionReq`]:
 ///
-/// ```rust
+/// ```
 /// use semver_parser::range;
 ///
 /// # fn try_main() -> Result<(), String> {
-///
 /// let r = range::parse("1.0.0")?;
 ///
 /// assert_eq!(range::Predicate {
@@ -441,11 +432,10 @@ pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
 ///
 /// Multiple predicates in [`VersionReq`]:
 ///
-/// ```rust
+/// ```
 /// use semver_parser::range;
 ///
 /// # fn try_main() -> Result<(), String> {
-///
 /// let r = range::parse("> 0.0.9, <= 2.5.3")?;
 ///
 /// assert_eq!(range::Predicate {

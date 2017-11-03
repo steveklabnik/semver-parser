@@ -1,19 +1,18 @@
 //! Collection of structures and helper functions for parsing semantic version.
 //!
-//! This crate contains data structures for holding version data and comparision of versions
+//! This crate contains data structures for holding version data and comparison of versions
 //! according to [Semantic versioning](http://semver.org/).
 //! Main structs are [`version::Version`] representing version itself and [`range::VersionReq`] as a
 //! collection of [`range::Predicate`]
-//! representing data for version comparision.
+//! representing data for version comparison.
 //!
-//! # Example
+//! # Examples
 //!
-//! ```rust
+//! ```
 //! use semver_parser::range;
 //! use semver_parser::version;
 //!
 //! # fn try_main() -> Result<(), String> {
-//!
 //! let r = range::parse("1.0.0")?;
 //!
 //! assert_eq!(range::Predicate {
