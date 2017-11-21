@@ -9,3 +9,4 @@ documentation = "https://docs.rs/semver-parser"
 description = """
 Parsing of the semver spec.
 """
+keywords = ["parser", "semver"]
