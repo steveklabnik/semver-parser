@@ -109,7 +109,7 @@ pub struct Version {
 /// # }
 /// ```
 /// [`Version`]: ./struct.Version.html
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq)]
 pub enum Identifier {
     /// An identifier that's solely numbers.
     Numeric(u64),
