@@ -1026,8 +1026,8 @@ mod tests {
 
     #[test]
     pub fn test_wildcard_partialord_lt() {
-        let expect_less = WildcardVersion::Major;
-        let other = WildcardVersion::Minor;
+        let expect_less = WildcardVersion::Minor;
+        let other = WildcardVersion::Patch;
         assert!(expect_less.lt(&other));
     }
 
@@ -1049,8 +1049,8 @@ mod tests {
 
     #[test]
     pub fn test_wildcard_partialord_ge() {
-        let strictly_gt = WildcardVersion::Minor;
-        let other = WildcardVersion::Major;
+        let strictly_gt = WildcardVersion::Patch;
+        let other = WildcardVersion::Minor;
         assert!(strictly_gt.ge(&other));
         assert!(other.ge(&other));
     }

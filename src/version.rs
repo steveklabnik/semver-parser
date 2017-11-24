@@ -97,7 +97,8 @@ pub struct Version {
 /// let version = version::parse("0.1.2-alpha1.0")?;
 ///
 /// let expected_pre = vec![
-///     version::Identifier::AlphaNumeric(String::from("alpha1")), Identifier::Numeric(0),
+///     version::Identifier::AlphaNumeric(String::from("alpha1")),
+///     version::Identifier::Numeric(0),
 /// ];
 ///
 /// assert_eq!(expected_pre, version.pre);
