@@ -118,7 +118,7 @@ use recognize::*;
 /// #   try_main().unwrap();
 /// # }
 /// [`Predicate`]: ./struct.Predicate.html
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct VersionReq {
     /// Collection of predicates.
     pub predicates: Vec<Predicate>,
