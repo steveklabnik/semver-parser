@@ -90,9 +90,9 @@ impl<'a> Recognize for &'a str {
 impl<P1: Recognize, P2: Recognize> Recognize for (P1, P2) {
     #[inline(always)]
     fn p(&self, s: &[u8]) -> Option<usize> {
-        self.0.p(s).and_then(|len1|
-            self.1.p(&s[len1..]).map(|len2|
-                len1 + len2))
+        self.0.p(s).and_then(|len1| {
+            self.1.p(&s[len1..]).map(|len2| len1 + len2)
+        })
     }
 }
 
@@ -132,11 +132,7 @@ impl<P: Recognize> Recognize for OneOrMore<P> {
             i += len;
             count += 1;
         }
-        if count >= 1 {
-            Some(i)
-        } else {
-            None
-        }
+        if count >= 1 { Some(i) } else { None }
     }
 }
 
