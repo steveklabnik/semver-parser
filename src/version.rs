@@ -60,7 +60,7 @@ use common::{self, numeric_identifier};
 /// #   try_main().unwrap();
 /// # }
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq)]
 pub struct Version {
     /// Major version as number (`0` in `"0.1.2"`).
     pub major: u64,
