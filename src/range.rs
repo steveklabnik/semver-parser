@@ -131,7 +131,7 @@ pub struct VersionReq {
 ///
 /// # Examples
 ///
-/// Parsing wildcard predicate and checking that its `op` is `WildcardVersion::Major`:
+/// Parsing wildcard predicate and checking that its predicates are empty.
 ///
 /// ```
 /// use semver_parser::range;
@@ -139,15 +139,7 @@ pub struct VersionReq {
 /// # fn try_main() -> Result<(), String> {
 /// let r = range::parse("*")?;
 ///
-/// assert_eq!(range::Predicate {
-///         op: range::Op::Wildcard(range::WildcardVersion::Major),
-///         major: 0,
-///         minor: None,
-///         patch: None,
-///         pre: Vec::new(),
-///     },
-///     r.predicates[0]
-/// );
+/// assert!(r.predicates.is_empty());
 /// # Ok(())
 /// # }
 /// #
@@ -159,8 +151,6 @@ pub struct VersionReq {
 /// [`Predicate`]: ./struct.Predicate.html
 #[derive(PartialOrd,PartialEq,Debug)]
 pub enum WildcardVersion {
-    /// Wildcard major version `*.2.3`.
-    Major,
     /// Wildcard minor version `1.*.3`.
     Minor,
     /// Wildcard patch version `1.2.*`.
@@ -477,13 +467,7 @@ pub fn parse(ranges: &str) -> Result<VersionReq, String> {
     || (ranges == "x")
     || (ranges == "X") {
         return Ok(VersionReq {
-            predicates: vec![Predicate {
-                op: Op::Wildcard(WildcardVersion::Major),
-                major: 0,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            }],
+            predicates: vec![],
         });
     }
 
@@ -683,61 +667,25 @@ mod tests {
     #[test]
     fn test_parsing_blank() {
         let r = range::parse("").unwrap();
-
-        assert_eq!(Predicate {
-                op: Op::Wildcard(WildcardVersion::Major),
-                major: 0,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
+        assert!(r.predicates.is_empty());
     }
 
     #[test]
     fn test_parsing_wildcard() {
         let r = range::parse("*").unwrap();
-
-        assert_eq!(Predicate {
-                op: Op::Wildcard(WildcardVersion::Major),
-                major: 0,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
+        assert!(r.predicates.is_empty());
     }
 
     #[test]
     fn test_parsing_x() {
         let r = range::parse("x").unwrap();
-
-        assert_eq!(Predicate {
-                op: Op::Wildcard(WildcardVersion::Major),
-                major: 0,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
+        assert!(r.predicates.is_empty());
     }
 
     #[test]
     fn test_parsing_capital_x() {
         let r = range::parse("X").unwrap();
-
-        assert_eq!(Predicate {
-                op: Op::Wildcard(WildcardVersion::Major),
-                major: 0,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
+        assert!(r.predicates.is_empty());
     }
 
     #[test]
