@@ -149,7 +149,7 @@ pub struct VersionReq {
 /// ```
 /// [`Op`]: ./enum.Op.html
 /// [`Predicate`]: ./struct.Predicate.html
-#[derive(PartialOrd, PartialEq, Debug)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Hash, Clone)]
 pub enum WildcardVersion {
     /// Wildcard minor version `1.*.3`.
     Minor,
@@ -183,7 +183,7 @@ pub enum WildcardVersion {
 /// ```
 /// [`Predicate`]: ./struct.Predicate.html
 /// [`version::Version`]: ../version/struct.Version.html
-#[derive(PartialOrd, PartialEq, Debug)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Hash)]
 pub enum Op {
     /// Exact, `=`.
     Ex,
@@ -249,7 +249,7 @@ impl FromStr for Op {
 /// ```
 /// [`Predicate`]: ./struct.Predicate.html
 /// [`version::Version`]: ../version/struct.Version.html
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash, PartialOrd, Ord)]
 pub struct Predicate {
     /// Operation code for this predicate, like "greater than" or "exact match".
     pub op: Op,
