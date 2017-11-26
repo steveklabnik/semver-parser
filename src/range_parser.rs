@@ -134,7 +134,7 @@ impl<'input> RangeParser<'input> {
 
         match self.pop()? {
             Token::Numeric(number) => Ok((Some(number), false)),
-            Token::Star => Ok((None, true)),
+            ref t if t.is_wildcard() => Ok((None, true)),
             tok => Err(UnexpectedToken(tok)),
         }
     }
@@ -211,7 +211,7 @@ impl<'input> RangeParser<'input> {
             Token::LtEq => (None, Op::LtEq),
             Token::Tilde => (None, Op::Tilde),
             Token::Caret => (None, Op::Compatible),
-            Token::Star => return Ok(None),
+            ref head if head.is_wildcard() => return Ok(None),
             // default op
             head => (Some(head), Op::Compatible),
         };
@@ -340,6 +340,19 @@ mod tests {
         assert_eq!(
             Op::Wildcard(WildcardVersion::Minor),
             parse("1.*.0").unwrap().predicates[0].op
+        );
+    }
+
+    // Any identifiers starting with 'x' or 'X' is combined to form the larger identifier.
+    #[test]
+    fn test_x_identifier() {
+        assert_eq!(
+            Identifier::AlphaNumeric("xXbeta1".to_string()),
+            parse("1-xXbeta1").unwrap().predicates[0].pre[0]
+        );
+        assert_eq!(
+            Identifier::AlphaNumeric("Xxbeta1".to_string()),
+            parse("1-Xxbeta1").unwrap().predicates[0].pre[0]
         );
     }
 

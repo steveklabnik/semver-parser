@@ -72,6 +72,14 @@ impl<'input> Token<'input> {
             _ => false,
         }
     }
+
+    /// Check if the current token is a wildcard token.
+    pub fn is_wildcard(&self) -> bool {
+        match *self {
+            Star | Identifier("X") | Identifier("x") => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -193,8 +201,6 @@ impl<'input> Iterator for RangeLexer<'input> {
                     '^' => Caret,
                     '~' => Tilde,
                     '*' => Star,
-                    'x' => Star,
-                    'X' => Star,
                     '.' => Dot,
                     ',' => Comma,
                     '-' => Hyphen,
@@ -202,7 +208,8 @@ impl<'input> Iterator for RangeLexer<'input> {
                         self.step();
                         return Some(self.build_metadata(start).map(BuildMetadata));
                     }
-                    '0'...'9' => {
+                    '0' => Numeric(0),
+                    '1'...'9' => {
                         self.step();
                         return Some(self.number(start).map(Numeric));
                     }
@@ -237,7 +244,7 @@ mod tests {
     #[test]
     pub fn all_tokens() {
         assert_eq!(
-            lex("=><.^~*1234<=>=||"),
+            lex("=><.^~*01234<=>=||"),
             vec![
                 Eq,
                 Gt,
@@ -246,6 +253,7 @@ mod tests {
                 Caret,
                 Tilde,
                 Star,
+                Numeric(0),
                 Numeric(1234),
                 LtEq,
                 GtEq,
@@ -261,8 +269,14 @@ mod tests {
 
     #[test]
     pub fn numeric_leading_zeros() {
-        assert_eq!(lex("0000"), vec![Numeric(0)]);
-        assert_eq!(lex("0001"), vec![Numeric(1)]);
+        assert_eq!(
+            lex("0000"),
+            vec![Numeric(0), Numeric(0), Numeric(0), Numeric(0)]
+        );
+        assert_eq!(
+            lex("0001"),
+            vec![Numeric(0), Numeric(0), Numeric(0), Numeric(1)]
+        );
     }
 
     #[test]
