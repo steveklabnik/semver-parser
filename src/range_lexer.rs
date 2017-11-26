@@ -1,3 +1,40 @@
+//! Lexer for semver ranges.
+//!
+//! Breaks a string of input into an iterator of tokens that can be used with a parser.
+//!
+//! This should be used with the [`range_parser`] module.
+//!
+//! [`range_parser`]: range_parser.html
+//!
+//! # Examples
+//!
+//! Example without errors:
+//!
+//! ```rust
+//! use semver_parser::range_lexer::{RangeLexer, Token};
+//!
+//! let mut l = RangeLexer::new("foo 123 *");
+//!
+//! assert_eq!(Some(Ok(Token::Identifier("foo"))), l.next());
+//! assert_eq!(Some(Ok(Token::Whitespace(3, 4))), l.next());
+//! assert_eq!(Some(Ok(Token::Numeric(123))), l.next());
+//! assert_eq!(Some(Ok(Token::Whitespace(7, 8))), l.next());
+//! assert_eq!(Some(Ok(Token::Star)), l.next());
+//! assert_eq!(None, l.next());
+//! ```
+//!
+//! Example with error:
+//!
+//! ```rust
+//! use semver_parser::range_lexer::{RangeLexer, Token, Error};
+//!
+//! let mut l = RangeLexer::new("foo / *");
+//!
+//! assert_eq!(Some(Ok(Token::Identifier("foo"))), l.next());
+//! assert_eq!(Some(Ok(Token::Whitespace(3, 4))), l.next());
+//! assert_eq!(Some(Err(Error::UnexpectedChar('/'))), l.next());
+//! ```
+
 use std::str;
 use self::Token::*;
 use self::Error::*;
@@ -82,7 +119,7 @@ impl<'input> Token<'input> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
     /// Unexpected character.
     UnexpectedChar(char),

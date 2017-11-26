@@ -1,3 +1,5 @@
+//! Recursive-descent parser for semver ranges.
+
 use range_lexer::{self, RangeLexer, Token};
 use self::Error::*;
 use range::{Predicate, Op, VersionReq, WildcardVersion};
