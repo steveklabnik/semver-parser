@@ -357,6 +357,18 @@ mod tests {
     }
 
     #[test]
+    fn test_uppercase_identifiers() {
+        assert_eq!(
+            Identifier::AlphaNumeric("Foo".to_string()),
+            parse("1-Foo").unwrap().predicates[0].pre[0]
+        );
+        assert_eq!(
+            Identifier::AlphaNumeric("foo".to_string()),
+            parse("1-foo").unwrap().predicates[0].pre[0]
+        );
+    }
+
+    #[test]
     fn test_parsing_default() {
         let r = parse("1.0.0").unwrap();
 

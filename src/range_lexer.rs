@@ -213,7 +213,7 @@ impl<'input> Iterator for RangeLexer<'input> {
                         self.step();
                         return Some(self.number(start).map(Numeric));
                     }
-                    'a'...'z' => {
+                    'a'...'z' | 'A'...'Z' => {
                         self.step();
                         return Some(self.identifier(start).map(Identifier));
                     }
