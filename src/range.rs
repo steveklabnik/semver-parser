@@ -682,6 +682,24 @@ mod tests {
     }
 
     #[test]
+    fn test_uppercase_prereleases() {
+        assert_eq!(
+            vec![Identifier::AlphaNumeric("Foo".to_string())],
+            range::parse("0-Foo").unwrap().predicates[0].pre
+        );
+
+        assert_eq!(
+            vec![Identifier::AlphaNumeric("X".to_string())],
+            range::parse("0-X").unwrap().predicates[0].pre
+        );
+    }
+
+    #[test]
+    fn test_empty_prerelease() {
+        assert!(range::parse("0-").is_err());
+    }
+
+    #[test]
     fn test_parsing_x() {
         let r = range::parse("x").unwrap();
         assert!(r.predicates.is_empty());
@@ -691,6 +709,23 @@ mod tests {
     fn test_parsing_capital_x() {
         let r = range::parse("X").unwrap();
         assert!(r.predicates.is_empty());
+    }
+
+    /// TODO: this should probably be using WildcardVersion::Minor
+    #[test]
+    fn test_parsing_wildcard_star_star() {
+        let r = range::parse("1.*.*").unwrap();
+
+        assert_eq!(
+            Predicate {
+                op: Op::Wildcard(WildcardVersion::Patch),
+                major: 1,
+                minor: None,
+                patch: None,
+                pre: Vec::new(),
+            },
+            r.predicates[0]
+        );
     }
 
     #[test]
@@ -703,6 +738,22 @@ mod tests {
                 major: 1,
                 minor: None,
                 patch: None,
+                pre: Vec::new(),
+            },
+            r.predicates[0]
+        );
+    }
+
+    #[test]
+    fn test_parsing_minor_wildcard_star_patch() {
+        let r = range::parse("1.*.0").unwrap();
+
+        assert_eq!(
+            Predicate {
+                op: Op::Wildcard(WildcardVersion::Minor),
+                major: 1,
+                minor: None,
+                patch: Some(0),
                 pre: Vec::new(),
             },
             r.predicates[0]
