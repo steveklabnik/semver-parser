@@ -51,9 +51,12 @@
 
 pub mod version;
 pub mod range;
+pub mod comparator;
 
 // for private stuff the two share
 mod common;
+mod range_lexer;
+mod range_parser;
 
 // for recognizer combinators
 mod recognize;

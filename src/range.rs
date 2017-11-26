@@ -491,6 +491,22 @@ mod tests {
     use version::Identifier;
 
     #[test]
+    fn test_parsing_wildcards() {
+        assert_eq!(
+            Op::Wildcard(WildcardVersion::Patch),
+            range::parse("1.0.*").unwrap().predicates[0].op
+        );
+        assert_eq!(
+            Op::Wildcard(WildcardVersion::Patch),
+            range::parse("1.*.*").unwrap().predicates[0].op
+        );
+        assert_eq!(
+            Op::Wildcard(WildcardVersion::Minor),
+            parse("1.*.0").unwrap().predicates[0].op
+        );
+    }
+
+    #[test]
     fn test_parsing_default() {
         let r = range::parse("1.0.0").unwrap();
 
@@ -1028,6 +1044,7 @@ mod tests {
         assert!(range::parse(">=").is_err());
         assert!(range::parse("> 0.1.0,").is_err());
         assert!(range::parse("> 0.3.0, ,").is_err());
+        assert!(range::parse("> 0. 1").is_err());
     }
 
     #[test]
