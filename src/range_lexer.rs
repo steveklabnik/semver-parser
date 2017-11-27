@@ -4,7 +4,7 @@
 //!
 //! This should be used with the [`range_parser`] module.
 //!
-//! [`range_parser`]: range_parser.html
+//! [`range_parser`]: ../range_parser/index.html
 //!
 //! # Examples
 //!

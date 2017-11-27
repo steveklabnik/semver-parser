@@ -1,4 +1,40 @@
 //! Recursive-descent parser for semver ranges.
+//!
+//! The parsers is divided into a set of functions, each responsible for parsing a subset of the
+//! grammar.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use semver_parser::range_parser::RangeParser;
+//! use semver_parser::range::Op;
+//!
+//! let mut p = RangeParser::new("^1").expect("a working parser");
+//!
+//! assert_eq!(Ok(Op::Compatible), p.op());
+//! assert_eq!(Ok(Some(1)), p.numeric());
+//! ```
+//!
+//! Example parsing a range:
+//!
+//! ```rust
+//! use semver_parser::range_parser::RangeParser;
+//! use semver_parser::range::{Op, Predicate};
+//!
+//! let mut p = RangeParser::new("^1.0").expect("a working parser");
+//!
+//! assert_eq!(Ok(Some(Predicate {
+//!     op: Op::Compatible,
+//!     major: 1,
+//!     minor: Some(0),
+//!     patch: None,
+//!     pre: vec![],
+//! })), p.predicate());
+//!
+//! let mut p = RangeParser::new("^*").expect("a working parser");
+//!
+//! assert_eq!(Ok(None), p.predicate());
+//! ```
 
 use range_lexer::{self, RangeLexer, Token};
 use self::Error::*;
@@ -56,6 +92,7 @@ pub struct RangeParser<'input> {
 }
 
 impl<'input> RangeParser<'input> {
+    /// Construct a new parser for the given input.
     pub fn new(input: &'input str) -> Result<RangeParser<'input>, Error<'input>> {
         let mut lexer = RangeLexer::new(input);
 
@@ -97,7 +134,8 @@ impl<'input> RangeParser<'input> {
         }
     }
 
-    fn comma_predicate(&mut self) -> Result<Option<Predicate>, Error<'input>> {
+    /// Parse an optional comma separator, then if that is present a predicate.
+    pub fn comma_predicate(&mut self) -> Result<Option<Predicate>, Error<'input>> {
         if !has_ws_separator!(self, Some(&Token::Comma)) {
             return Ok(None);
         }
@@ -109,6 +147,7 @@ impl<'input> RangeParser<'input> {
         }
     }
 
+    /// Parse an optional or separator `||`, then if that is present a range.
     fn or_range(&mut self) -> Result<Option<VersionReq>, Error<'input>> {
         if !has_ws_separator!(self, Some(&Token::Or)) {
             return Ok(None);
@@ -120,7 +159,7 @@ impl<'input> RangeParser<'input> {
     /// Parse a single numeric component.
     ///
     /// Returns `None` if the component is a wildcard.
-    fn numeric(&mut self) -> Result<Option<u64>, Error<'input>> {
+    pub fn numeric(&mut self) -> Result<Option<u64>, Error<'input>> {
         match self.pop()? {
             Token::Numeric(number) => Ok(Some(number)),
             ref t if t.is_wildcard() => Ok(None),
@@ -136,7 +175,7 @@ impl<'input> RangeParser<'input> {
     /// If a dot is not encountered, `(None, false)` is returned.
     ///
     /// If a wildcard is encountered, `(None, true)` is returned.
-    fn dot_numeric(&mut self) -> Result<(Option<u64>, bool), Error<'input>> {
+    pub fn dot_numeric(&mut self) -> Result<(Option<u64>, bool), Error<'input>> {
         match self.peek() {
             Some(&Token::Dot) => {}
             _ => return Ok((None, false)),
@@ -147,8 +186,10 @@ impl<'input> RangeParser<'input> {
         self.numeric().map(|n| (n, n.is_none()))
     }
 
-    /// Parse a single identifier.
-    fn identifier(&mut self) -> Result<Identifier, Error<'input>> {
+    /// Parse an string identifier.
+    ///
+    /// Like, `foo`, or `bar`.
+    pub fn identifier(&mut self) -> Result<Identifier, Error<'input>> {
         let identifier = match self.pop()? {
             Token::Identifier(identifier) => {
                 // TODO: Borrow?
@@ -161,7 +202,9 @@ impl<'input> RangeParser<'input> {
         Ok(identifier)
     }
 
-    /// Parse pre-release identifiers.
+    /// Parse all pre-release identifiers, separated by dots.
+    ///
+    /// Like, `abcdef.1234`.
     fn pre(&mut self) -> Result<Vec<Identifier>, Error<'input>> {
         match self.peek() {
             Some(&Token::Hyphen) => {}
@@ -191,6 +234,8 @@ impl<'input> RangeParser<'input> {
     }
 
     /// Parse optional build metadata.
+    ///
+    /// Like, `` (empty), or `+abcdef`.
     fn build_metadata(&mut self) -> Result<(), Error<'input>> {
         match self.peek() {
             Some(&Token::BuildMetadata(_)) => {}
@@ -203,6 +248,8 @@ impl<'input> RangeParser<'input> {
     }
 
     /// Optionally parse a single operator.
+    ///
+    /// Like, `~`, or `^`.
     pub fn op(&mut self) -> Result<Op, Error<'input>> {
         use self::Token::*;
 
@@ -225,6 +272,8 @@ impl<'input> RangeParser<'input> {
     }
 
     /// Parse a single predicate.
+    ///
+    /// Like, `^1`, or `>=2.0.0`.
     pub fn predicate(&mut self) -> Result<Option<Predicate>, Error<'input>> {
         // empty predicate, treated the same as wildcard.
         if self.peek().is_none() {
@@ -263,6 +312,9 @@ impl<'input> RangeParser<'input> {
         }))
     }
 
+    /// Parse a single range.
+    ///
+    /// Like, `^1.0` or `>=3.0.0, <4.0.0`.
     pub fn range(&mut self) -> Result<VersionReq, Error<'input>> {
         let mut predicates = Vec::new();
 
@@ -277,7 +329,10 @@ impl<'input> RangeParser<'input> {
         Ok(VersionReq { predicates: predicates })
     }
 
-    pub fn range_set(&mut self) -> Result<Comparator, Error<'input>> {
+    /// Parse a comparator.
+    ///
+    /// Like, `1.0 || 2.0` or `^1 || >=3.0.0, <4.0.0`.
+    pub fn comparator(&mut self) -> Result<Comparator, Error<'input>> {
         let mut ranges = Vec::new();
         ranges.push(self.range()?);
 
@@ -296,13 +351,13 @@ impl<'input> RangeParser<'input> {
 
 pub fn parse_comparator<'input>(input: &'input str) -> Result<Comparator, Error<'input>> {
     let mut parser = RangeParser::new(input)?;
-    let range_set = parser.range_set()?;
+    let comparator = parser.comparator()?;
 
     if !parser.is_eof() {
         return Err(MoreInput);
     }
 
-    Ok(range_set)
+    Ok(comparator)
 }
 
 pub fn parse<'input>(input: &'input str) -> Result<VersionReq, Error<'input>> {
