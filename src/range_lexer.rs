@@ -269,8 +269,6 @@ impl<'input> Iterator for RangeLexer<'input> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use self::Token::*;
-    use self::Error::*;
 
     fn lex(input: &str) -> Vec<Token> {
         RangeLexer::new(input)

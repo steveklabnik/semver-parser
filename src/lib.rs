@@ -50,13 +50,13 @@
 #![doc(html_root_url = "https://docs.rs/semver-parser/0.8.0")]
 
 pub mod version;
-pub mod range;
 pub mod comparator;
+pub mod range;
+pub mod range_lexer;
+pub mod range_parser;
 
 // for private stuff the two share
 mod common;
-pub mod range_lexer;
-pub mod range_parser;
 
 // for recognizer combinators
 mod recognize;

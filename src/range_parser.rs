@@ -25,7 +25,7 @@ macro_rules! has_ws_separator {
     }}
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error<'input> {
     /// Needed more tokens for parsing, but none are available.
     UnexpectedEnd,
@@ -117,6 +117,17 @@ impl<'input> RangeParser<'input> {
         Ok(Some(self.range()?))
     }
 
+    /// Parse a single numeric component.
+    ///
+    /// Returns `None` if the component is a wildcard.
+    fn numeric(&mut self) -> Result<Option<u64>, Error<'input>> {
+        match self.pop()? {
+            Token::Numeric(number) => Ok(Some(number)),
+            ref t if t.is_wildcard() => Ok(None),
+            tok => Err(UnexpectedToken(tok)),
+        }
+    }
+
     /// Optionally parse a dot, then a numeric component.
     ///
     /// The second component of the tuple indicates if a wildcard has been encountered, and is
@@ -133,12 +144,7 @@ impl<'input> RangeParser<'input> {
 
         // pop the peeked dot.
         self.pop()?;
-
-        match self.pop()? {
-            Token::Numeric(number) => Ok((Some(number), false)),
-            ref t if t.is_wildcard() => Ok((None, true)),
-            tok => Err(UnexpectedToken(tok)),
-        }
+        self.numeric().map(|n| (n, n.is_none()))
     }
 
     /// Parse a single identifier.
@@ -196,42 +202,40 @@ impl<'input> RangeParser<'input> {
         Ok(())
     }
 
+    /// Optionally parse a single operator.
+    pub fn op(&mut self) -> Result<Op, Error<'input>> {
+        use self::Token::*;
+
+        let op = match self.peek() {
+            Some(&Eq) => Op::Ex,
+            Some(&Gt) => Op::Gt,
+            Some(&GtEq) => Op::GtEq,
+            Some(&Lt) => Op::Lt,
+            Some(&LtEq) => Op::LtEq,
+            Some(&Tilde) => Op::Tilde,
+            Some(&Caret) => Op::Compatible,
+            // default op
+            _ => return Ok(Op::Compatible),
+        };
+
+        // remove the matched token.
+        self.pop()?;
+        self.skip_whitespace()?;
+        Ok(op)
+    }
+
     /// Parse a single predicate.
     pub fn predicate(&mut self) -> Result<Option<Predicate>, Error<'input>> {
-        // empty predicate.
+        // empty predicate, treated the same as wildcard.
         if self.peek().is_none() {
             return Ok(None);
         }
 
-        let head = self.pop()?;
+        let mut op = self.op()?;
 
-        let (tok, mut op) = match head {
-            Token::Eq => (None, Op::Ex),
-            Token::Gt => (None, Op::Gt),
-            Token::GtEq => (None, Op::GtEq),
-            Token::Lt => (None, Op::Lt),
-            Token::LtEq => (None, Op::LtEq),
-            Token::Tilde => (None, Op::Tilde),
-            Token::Caret => (None, Op::Compatible),
-            ref head if head.is_wildcard() => return Ok(None),
-            // default op
-            head => (Some(head), Op::Compatible),
-        };
-
-        // make use of token carried over, or pop a new one if operator found.
-        let tok = if let Some(tok) = tok {
-            tok
-        } else {
-            // pop a new token, whie skipping one set of whitespace
-            match self.pop()? {
-                Token::Whitespace(_, _) => self.pop()?,
-                tok => tok,
-            }
-        };
-
-        let major = match tok {
-            Token::Numeric(number) => number,
-            tok => return Err(UnexpectedToken(tok)),
+        let major = match self.numeric()? {
+            Some(major) => major,
+            None => return Ok(None),
         };
 
         let (minor, minor_wildcard) = self.dot_numeric()?;
@@ -290,7 +294,7 @@ impl<'input> RangeParser<'input> {
     }
 }
 
-fn parse_comparator<'input>(input: &'input str) -> Result<Comparator, Error<'input>> {
+pub fn parse_comparator<'input>(input: &'input str) -> Result<Comparator, Error<'input>> {
     let mut parser = RangeParser::new(input)?;
     let range_set = parser.range_set()?;
 
@@ -301,7 +305,7 @@ fn parse_comparator<'input>(input: &'input str) -> Result<Comparator, Error<'inp
     Ok(range_set)
 }
 
-fn parse<'input>(input: &'input str) -> Result<VersionReq, Error<'input>> {
+pub fn parse<'input>(input: &'input str) -> Result<VersionReq, Error<'input>> {
     let mut parser = RangeParser::new(input)?;
     let range = parser.range()?;
 
@@ -315,6 +319,34 @@ fn parse<'input>(input: &'input str) -> Result<VersionReq, Error<'input>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn p<'input>(input: &'input str) -> RangeParser<'input> {
+        RangeParser::new(input).unwrap()
+    }
+
+    #[test]
+    fn test_numeric() {
+        use self::Token::*;
+        use self::Error::*;
+
+        assert_eq!(Ok(Some(42)), p("42").numeric());
+        assert_eq!(Ok(None), p("*").numeric());
+        assert_eq!(Ok(None), p("x").numeric());
+        assert_eq!(Ok(None), p("X").numeric());
+        assert_eq!(Err(UnexpectedToken(Identifier("foo"))), p("foo").numeric());
+    }
+
+    #[test]
+    fn test_dot_numeric() {
+        use self::Error::*;
+
+        assert_eq!(Ok((None, false)), p("").dot_numeric());
+        assert_eq!(Ok((Some(42), false)), p(".42").dot_numeric());
+        assert_eq!(Ok((None, true)), p(".*").dot_numeric());
+        assert_eq!(Ok((None, true)), p(".x").dot_numeric());
+        assert_eq!(Ok((None, true)), p(".X").dot_numeric());
+        assert_eq!(Err(UnexpectedEnd), p(".").dot_numeric());
+    }
 
     #[test]
     fn test_range_sets() {
