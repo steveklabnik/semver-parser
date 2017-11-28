@@ -213,10 +213,14 @@ impl<'input> RangeParser<'input> {
 
         // pop the peeked hyphen.
         self.pop()?;
+        self.parts()
+    }
 
-        let mut pre = Vec::new();
+    /// Parse a dot-separated set of identifiers.
+    fn parts(&mut self) -> Result<Vec<Identifier>, Error<'input>> {
+        let mut parts = Vec::new();
 
-        pre.push(self.identifier()?);
+        parts.push(self.identifier()?);
 
         loop {
             match self.peek() {
@@ -227,24 +231,24 @@ impl<'input> RangeParser<'input> {
             // pop the peeked hyphen.
             self.pop()?;
 
-            pre.push(self.identifier()?);
+            parts.push(self.identifier()?);
         }
 
-        Ok(pre)
+        Ok(parts)
     }
 
     /// Parse optional build metadata.
     ///
     /// Like, `` (empty), or `+abcdef`.
-    fn build_metadata(&mut self) -> Result<(), Error<'input>> {
+    fn plus_build_metadata(&mut self) -> Result<Vec<Identifier>, Error<'input>> {
         match self.peek() {
-            Some(&Token::BuildMetadata(_)) => {}
-            _ => return Ok(()),
+            Some(&Token::Plus) => {}
+            _ => return Ok(vec![]),
         }
 
-        // pop the build metadata.
+        // pop the plus.
         self.pop()?;
-        Ok(())
+        self.parts()
     }
 
     /// Optionally parse a single operator.
@@ -301,7 +305,7 @@ impl<'input> RangeParser<'input> {
         }
 
         // ignore build metadata
-        self.build_metadata()?;
+        self.plus_build_metadata()?;
 
         Ok(Some(Predicate {
             op: op,
@@ -360,7 +364,7 @@ pub fn parse_comparator<'input>(input: &'input str) -> Result<Comparator, Error<
     Ok(comparator)
 }
 
-pub fn parse<'input>(input: &'input str) -> Result<VersionReq, Error<'input>> {
+pub fn parse_range<'input>(input: &'input str) -> Result<VersionReq, Error<'input>> {
     let mut parser = RangeParser::new(input)?;
     let range = parser.range()?;
 
@@ -377,6 +381,14 @@ mod tests {
 
     fn p<'input>(input: &'input str) -> RangeParser<'input> {
         RangeParser::new(input).unwrap()
+    }
+
+    fn range<'input>(input: &'input str) -> Result<VersionReq, Error<'input>> {
+        parse_range(input)
+    }
+
+    fn comparator<'input>(input: &'input str) -> Result<Comparator, Error<'input>> {
+        parse_comparator(input)
     }
 
     #[test]
@@ -405,10 +417,10 @@ mod tests {
 
     #[test]
     fn test_range_sets() {
-        assert_eq!(1, parse_comparator("1.0.0").unwrap().ranges.len());
-        assert_eq!(2, parse_comparator("1.0.0 || ^4").unwrap().ranges.len());
+        assert_eq!(1, comparator("1.0.0").unwrap().ranges.len());
+        assert_eq!(2, comparator("1.0.0 || ^4").unwrap().ranges.len());
 
-        let c3 = parse_comparator("1.0.0 || ^4 || ~10, ~11, ~12").unwrap();
+        let c3 = comparator("1.0.0 || ^4 || ~10, ~11, ~12").unwrap();
 
         assert_eq!(3, c3.ranges.len());
         assert_eq!(1, c3.ranges[0].predicates.len());
@@ -420,46 +432,42 @@ mod tests {
     fn test_parsing_wildcards() {
         assert_eq!(
             Op::Wildcard(WildcardVersion::Patch),
-            parse("1.0.*").unwrap().predicates[0].op
+            range("1.0.*").unwrap().predicates[0].op
         );
         assert_eq!(
             Op::Wildcard(WildcardVersion::Patch),
-            parse("1.*.*").unwrap().predicates[0].op
+            range("1.*.*").unwrap().predicates[0].op
         );
         assert_eq!(
             Op::Wildcard(WildcardVersion::Minor),
-            parse("1.*.0").unwrap().predicates[0].op
-        );
-    }
-
-    // Any identifiers starting with 'x' or 'X' is combined to form the larger identifier.
-    #[test]
-    fn test_x_identifier() {
-        assert_eq!(
-            Identifier::AlphaNumeric("xXbeta1".to_string()),
-            parse("1-xXbeta1").unwrap().predicates[0].pre[0]
-        );
-        assert_eq!(
-            Identifier::AlphaNumeric("Xxbeta1".to_string()),
-            parse("1-Xxbeta1").unwrap().predicates[0].pre[0]
+            range("1.*.0").unwrap().predicates[0].op
         );
     }
 
     #[test]
-    fn test_uppercase_identifiers() {
-        assert_eq!(
-            Identifier::AlphaNumeric("Foo".to_string()),
-            parse("1-Foo").unwrap().predicates[0].pre[0]
-        );
-        assert_eq!(
-            Identifier::AlphaNumeric("foo".to_string()),
-            parse("1-foo").unwrap().predicates[0].pre[0]
-        );
+    fn test_pre() {
+        let tests = vec![
+            ("0", vec![]),
+            ("0-foo", vec!["foo"]),
+            ("0-foo.bar", vec!["foo", "bar"]),
+            ("0-FOO.BAR", vec!["FOO", "BAR"]),
+            ("0-foo+1234", vec!["foo"]),
+        ];
+
+        for (input, expected) in tests {
+            let expected: Vec<Identifier> = expected
+                .into_iter()
+                .map(ToString::to_string)
+                .map(Identifier::AlphaNumeric)
+                .collect();
+
+            assert_eq!(expected, range(input).unwrap().predicates[0].pre);
+        }
     }
 
     #[test]
     fn test_parsing_default() {
-        let r = parse("1.0.0").unwrap();
+        let r = range("1.0.0").unwrap();
 
         assert_eq!(
             Predicate {
@@ -475,7 +483,7 @@ mod tests {
 
     #[test]
     fn test_parsing_exact_01() {
-        let r = parse("=1.0.0").unwrap();
+        let r = range("=1.0.0").unwrap();
 
         assert_eq!(
             Predicate {
@@ -491,7 +499,7 @@ mod tests {
 
     #[test]
     fn test_parsing_exact_02() {
-        let r = parse("=0.9.0").unwrap();
+        let r = range("=0.9.0").unwrap();
 
         assert_eq!(
             Predicate {
@@ -507,7 +515,7 @@ mod tests {
 
     #[test]
     fn test_parsing_exact_03() {
-        let r = parse("=0.1.0-beta2.a").unwrap();
+        let r = range("=0.1.0-beta2.a").unwrap();
 
         assert_eq!(
             Predicate {
@@ -526,7 +534,7 @@ mod tests {
 
     #[test]
     pub fn test_parsing_greater_than() {
-        let r = parse("> 1.0.0").unwrap();
+        let r = range("> 1.0.0").unwrap();
 
         assert_eq!(
             Predicate {
@@ -542,7 +550,7 @@ mod tests {
 
     #[test]
     pub fn test_parsing_greater_than_01() {
-        let r = parse(">= 1.0.0").unwrap();
+        let r = range(">= 1.0.0").unwrap();
 
         assert_eq!(
             Predicate {
@@ -558,7 +566,7 @@ mod tests {
 
     #[test]
     pub fn test_parsing_greater_than_02() {
-        let r = parse(">= 2.1.0-alpha2").unwrap();
+        let r = range(">= 2.1.0-alpha2").unwrap();
 
         assert_eq!(
             Predicate {
@@ -574,7 +582,7 @@ mod tests {
 
     #[test]
     pub fn test_parsing_less_than() {
-        let r = parse("< 1.0.0").unwrap();
+        let r = range("< 1.0.0").unwrap();
 
         assert_eq!(
             Predicate {
@@ -590,7 +598,7 @@ mod tests {
 
     #[test]
     pub fn test_parsing_less_than_eq() {
-        let r = parse("<= 2.1.0-alpha2").unwrap();
+        let r = range("<= 2.1.0-alpha2").unwrap();
 
         assert_eq!(
             Predicate {
@@ -606,7 +614,7 @@ mod tests {
 
     #[test]
     pub fn test_parsing_tilde() {
-        let r = parse("~1").unwrap();
+        let r = range("~1").unwrap();
 
         assert_eq!(
             Predicate {
@@ -622,7 +630,7 @@ mod tests {
 
     #[test]
     pub fn test_parsing_compatible() {
-        let r = parse("^0").unwrap();
+        let r = range("^0").unwrap();
 
         assert_eq!(
             Predicate {
@@ -638,31 +646,53 @@ mod tests {
 
     #[test]
     fn test_parsing_blank() {
-        let r = parse("").unwrap();
+        let r = range("").unwrap();
         assert!(r.predicates.is_empty());
     }
 
     #[test]
     fn test_parsing_wildcard() {
-        let r = parse("*").unwrap();
+        let r = range("*").unwrap();
         assert!(r.predicates.is_empty());
     }
 
     #[test]
+    fn test_empty_prerelease() {
+        assert!(range("0-").is_err());
+    }
+
+    #[test]
     fn test_parsing_x() {
-        let r = parse("x").unwrap();
+        let r = range("x").unwrap();
         assert!(r.predicates.is_empty());
     }
 
     #[test]
     fn test_parsing_capital_x() {
-        let r = parse("X").unwrap();
+        let r = range("X").unwrap();
         assert!(r.predicates.is_empty());
+    }
+
+    /// TODO: this should probably be using WildcardVersion::Minor
+    #[test]
+    fn test_parsing_wildcard_star_star() {
+        let r = range("1.*.*").unwrap();
+
+        assert_eq!(
+            Predicate {
+                op: Op::Wildcard(WildcardVersion::Patch),
+                major: 1,
+                minor: None,
+                patch: None,
+                pre: Vec::new(),
+            },
+            r.predicates[0]
+        );
     }
 
     #[test]
     fn test_parsing_minor_wildcard_star() {
-        let r = parse("1.*").unwrap();
+        let r = range("1.*").unwrap();
 
         assert_eq!(
             Predicate {
@@ -677,8 +707,24 @@ mod tests {
     }
 
     #[test]
+    fn test_parsing_minor_wildcard_star_patch() {
+        let r = range("1.*.0").unwrap();
+
+        assert_eq!(
+            Predicate {
+                op: Op::Wildcard(WildcardVersion::Minor),
+                major: 1,
+                minor: None,
+                patch: Some(0),
+                pre: Vec::new(),
+            },
+            r.predicates[0]
+        );
+    }
+
+    #[test]
     fn test_parsing_minor_wildcard_x() {
-        let r = parse("1.x").unwrap();
+        let r = range("1.x").unwrap();
 
         assert_eq!(
             Predicate {
@@ -694,7 +740,7 @@ mod tests {
 
     #[test]
     fn test_parsing_minor_wildcard_capital_x() {
-        let r = parse("1.X").unwrap();
+        let r = range("1.X").unwrap();
 
         assert_eq!(
             Predicate {
@@ -710,7 +756,7 @@ mod tests {
 
     #[test]
     fn test_parsing_patch_wildcard_star() {
-        let r = parse("1.2.*").unwrap();
+        let r = range("1.2.*").unwrap();
 
         assert_eq!(
             Predicate {
@@ -726,7 +772,7 @@ mod tests {
 
     #[test]
     fn test_parsing_patch_wildcard_x() {
-        let r = parse("1.2.x").unwrap();
+        let r = range("1.2.x").unwrap();
 
         assert_eq!(
             Predicate {
@@ -742,7 +788,7 @@ mod tests {
 
     #[test]
     fn test_parsing_patch_wildcard_capital_x() {
-        let r = parse("1.2.X").unwrap();
+        let r = range("1.2.X").unwrap();
 
         assert_eq!(
             Predicate {
@@ -758,7 +804,7 @@ mod tests {
 
     #[test]
     pub fn test_multiple_01() {
-        let r = parse("> 0.0.9, <= 2.5.3").unwrap();
+        let r = range("> 0.0.9, <= 2.5.3").unwrap();
 
         assert_eq!(
             Predicate {
@@ -785,7 +831,7 @@ mod tests {
 
     #[test]
     pub fn test_multiple_02() {
-        let r = parse("0.3.0, 0.4.0").unwrap();
+        let r = range("0.3.0, 0.4.0").unwrap();
 
         assert_eq!(
             Predicate {
@@ -812,7 +858,7 @@ mod tests {
 
     #[test]
     pub fn test_multiple_03() {
-        let r = parse("<= 0.2.0, >= 0.5.0").unwrap();
+        let r = range("<= 0.2.0, >= 0.5.0").unwrap();
 
         assert_eq!(
             Predicate {
@@ -839,7 +885,7 @@ mod tests {
 
     #[test]
     pub fn test_multiple_04() {
-        let r = parse("0.1.0, 0.1.4, 0.1.6").unwrap();
+        let r = range("0.1.0, 0.1.4, 0.1.6").unwrap();
 
         assert_eq!(
             Predicate {
@@ -877,7 +923,7 @@ mod tests {
 
     #[test]
     pub fn test_multiple_05() {
-        let r = parse(">=0.5.1-alpha3, <0.6").unwrap();
+        let r = range(">=0.5.1-alpha3, <0.6").unwrap();
 
         assert_eq!(
             Predicate {
@@ -903,44 +949,44 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_build_metadata_with_predicate() {
+    fn test_range_build_metadata_with_predicate() {
         assert_eq!(
-            parse("^1.2.3+meta").unwrap().predicates[0].op,
+            range("^1.2.3+meta").unwrap().predicates[0].op,
             Op::Compatible
         );
-        assert_eq!(parse("~1.2.3+meta").unwrap().predicates[0].op, Op::Tilde);
-        assert_eq!(parse("=1.2.3+meta").unwrap().predicates[0].op, Op::Ex);
-        assert_eq!(parse("<=1.2.3+meta").unwrap().predicates[0].op, Op::LtEq);
-        assert_eq!(parse(">=1.2.3+meta").unwrap().predicates[0].op, Op::GtEq);
-        assert_eq!(parse("<1.2.3+meta").unwrap().predicates[0].op, Op::Lt);
-        assert_eq!(parse(">1.2.3+meta").unwrap().predicates[0].op, Op::Gt);
+        assert_eq!(range("~1.2.3+meta").unwrap().predicates[0].op, Op::Tilde);
+        assert_eq!(range("=1.2.3+meta").unwrap().predicates[0].op, Op::Ex);
+        assert_eq!(range("<=1.2.3+meta").unwrap().predicates[0].op, Op::LtEq);
+        assert_eq!(range(">=1.2.3+meta").unwrap().predicates[0].op, Op::GtEq);
+        assert_eq!(range("<1.2.3+meta").unwrap().predicates[0].op, Op::Lt);
+        assert_eq!(range(">1.2.3+meta").unwrap().predicates[0].op, Op::Gt);
     }
 
     #[test]
-    pub fn test_parse_errors() {
-        assert!(parse("\0").is_err());
-        assert!(parse(">= >= 0.0.2").is_err());
-        assert!(parse(">== 0.0.2").is_err());
-        assert!(parse("a.0.0").is_err());
-        assert!(parse("1.0.0-").is_err());
-        assert!(parse(">=").is_err());
-        assert!(parse("> 0.1.0,").is_err());
-        assert!(parse("> 0.3.0, ,").is_err());
-        assert!(parse("> 0. 1").is_err());
+    pub fn test_range_errors() {
+        assert!(range("\0").is_err());
+        assert!(range(">= >= 0.0.2").is_err());
+        assert!(range(">== 0.0.2").is_err());
+        assert!(range("a.0.0").is_err());
+        assert!(range("1.0.0-").is_err());
+        assert!(range(">=").is_err());
+        assert!(range("> 0.1.0,").is_err());
+        assert!(range("> 0.3.0, ,").is_err());
+        assert!(range("> 0. 1").is_err());
     }
 
     #[test]
     pub fn test_large_major_version() {
-        assert!(parse("18446744073709551617.0.0").is_err());
+        assert!(range("18446744073709551617.0.0").is_err());
     }
 
     #[test]
     pub fn test_large_minor_version() {
-        assert!(parse("0.18446744073709551617.0").is_err());
+        assert!(range("0.18446744073709551617.0").is_err());
     }
 
     #[test]
     pub fn test_large_patch_version() {
-        assert!(parse("0.0.18446744073709551617").is_err());
+        assert!(range("0.0.18446744073709551617").is_err());
     }
 }

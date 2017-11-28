@@ -89,6 +89,8 @@ pub enum Token<'input> {
     Comma,
     /// `-`
     Hyphen,
+    /// `+`
+    Plus,
     /// '||'
     Or,
     /// any number of whitespace (`\t\r\n `) and its span.
@@ -97,8 +99,6 @@ pub enum Token<'input> {
     Numeric(u64),
     /// Identifier component, like alpha1
     Identifier(&'input str),
-    /// Build metadata component, things after '+'.
-    BuildMetadata(&'input str),
 }
 
 impl<'input> Token<'input> {
@@ -188,13 +188,7 @@ impl<'input> RangeLexer<'input> {
 
     /// Consume an identifier.
     fn identifier(&mut self, start: usize) -> Result<&'input str, Error> {
-        let end = scan_while!(self, start, '0'...'9' | 'A'...'Z' | 'a'...'z' | '+' | '-');
-        Ok(&self.input[start..end])
-    }
-
-    /// Consume build metadata
-    fn build_metadata(&mut self, start: usize) -> Result<&'input str, Error> {
-        let end = scan_while!(self, start, '0'...'9' | 'A'...'Z' | 'a'...'z' | '+' | '-' | '.');
+        let end = scan_while!(self, start, '0'...'9' | 'A'...'Z' | 'a'...'z' | '-');
         Ok(&self.input[start..end])
     }
 
@@ -241,10 +235,7 @@ impl<'input> Iterator for RangeLexer<'input> {
                     '.' => Dot,
                     ',' => Comma,
                     '-' => Hyphen,
-                    '+' => {
-                        self.step();
-                        return Some(self.build_metadata(start).map(BuildMetadata));
-                    }
+                    '+' => Plus,
                     '0' => Numeric(0),
                     '1'...'9' => {
                         self.step();
