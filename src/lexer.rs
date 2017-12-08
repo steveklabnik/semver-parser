@@ -15,7 +15,7 @@
 //!
 //! let mut l = Lexer::new("foo 123 *");
 //!
-//! assert_eq!(Some(Ok(Token::Identifier("foo"))), l.next());
+//! assert_eq!(Some(Ok(Token::AlphaNumeric("foo"))), l.next());
 //! assert_eq!(Some(Ok(Token::Whitespace(3, 4))), l.next());
 //! assert_eq!(Some(Ok(Token::Numeric(123))), l.next());
 //! assert_eq!(Some(Ok(Token::Whitespace(7, 8))), l.next());
@@ -30,7 +30,7 @@
 //!
 //! let mut l = Lexer::new("foo / *");
 //!
-//! assert_eq!(Some(Ok(Token::Identifier("foo"))), l.next());
+//! assert_eq!(Some(Ok(Token::AlphaNumeric("foo"))), l.next());
 //! assert_eq!(Some(Ok(Token::Whitespace(3, 4))), l.next());
 //! assert_eq!(Some(Err(Error::UnexpectedChar('/'))), l.next());
 //! ```
@@ -95,10 +95,10 @@ pub enum Token<'input> {
     Or,
     /// any number of whitespace (`\t\r\n `) and its span.
     Whitespace(usize, usize),
-    /// Numeric component, like 0001
+    /// Numeric component, like `0` or `42`.
     Numeric(u64),
-    /// Identifier component, like alpha1
-    Identifier(&'input str),
+    /// Alphanumeric component, like `alpha1` or `79deadbe`.
+    AlphaNumeric(&'input str),
 }
 
 impl<'input> Token<'input> {
@@ -113,7 +113,9 @@ impl<'input> Token<'input> {
     /// Check if the current token is a wildcard token.
     pub fn is_wildcard(&self) -> bool {
         match *self {
-            Star | Identifier("X") | Identifier("x") => true,
+            Star |
+            AlphaNumeric("X") |
+            AlphaNumeric("x") => true,
             _ => false,
         }
     }
@@ -176,7 +178,7 @@ impl<'input> Lexer<'input> {
 
     /// Consume a component.
     ///
-    /// A component can either be an identifier (alphanumeric) or numeric.
+    /// A component can either be an alphanumeric or numeric.
     /// Does not permit leading zeroes if numeric.
     fn component(&mut self, start: usize) -> Result<Token<'input>, Error> {
         let end = scan_while!(self, start, '0'...'9' | 'A'...'Z' | 'a'...'z');
@@ -196,7 +198,7 @@ impl<'input> Lexer<'input> {
             }
         }
 
-        Ok(Identifier(input))
+        Ok(AlphaNumeric(input))
     }
 
     /// Consume whitespace.
@@ -296,8 +298,8 @@ mod tests {
 
     #[test]
     pub fn numeric_leading_zeros() {
-        assert_eq!(lex("0000"), vec![Identifier("0000")]);
-        assert_eq!(lex("0001"), vec![Identifier("0001")]);
+        assert_eq!(lex("0000"), vec![AlphaNumeric("0000")]);
+        assert_eq!(lex("0001"), vec![AlphaNumeric("0001")]);
     }
 
     #[test]

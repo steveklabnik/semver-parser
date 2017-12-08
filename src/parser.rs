@@ -232,7 +232,7 @@ impl<'input> Parser<'input> {
     /// Like, `foo`, or `bar`.
     pub fn identifier(&mut self) -> Result<Identifier, Error<'input>> {
         let identifier = match self.pop()? {
-            Token::Identifier(identifier) => {
+            Token::AlphaNumeric(identifier) => {
                 // TODO: Borrow?
                 Identifier::AlphaNumeric(identifier.to_string())
             }
