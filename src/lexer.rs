@@ -2,18 +2,18 @@
 //!
 //! Breaks a string of input into an iterator of tokens that can be used with a parser.
 //!
-//! This should be used with the [`range_parser`] module.
+//! This should be used with the [`parser`] module.
 //!
-//! [`range_parser`]: ../range_parser/index.html
+//! [`parser`]: ../parser/index.html
 //!
 //! # Examples
 //!
 //! Example without errors:
 //!
 //! ```rust
-//! use semver_parser::range_lexer::{RangeLexer, Token};
+//! use semver_parser::lexer::{Lexer, Token};
 //!
-//! let mut l = RangeLexer::new("foo 123 *");
+//! let mut l = Lexer::new("foo 123 *");
 //!
 //! assert_eq!(Some(Ok(Token::Identifier("foo"))), l.next());
 //! assert_eq!(Some(Ok(Token::Whitespace(3, 4))), l.next());
@@ -26,9 +26,9 @@
 //! Example with error:
 //!
 //! ```rust
-//! use semver_parser::range_lexer::{RangeLexer, Token, Error};
+//! use semver_parser::lexer::{Lexer, Token, Error};
 //!
-//! let mut l = RangeLexer::new("foo / *");
+//! let mut l = Lexer::new("foo / *");
 //!
 //! assert_eq!(Some(Ok(Token::Identifier("foo"))), l.next());
 //! assert_eq!(Some(Ok(Token::Whitespace(3, 4))), l.next());
@@ -129,7 +129,7 @@ pub enum Error {
 
 /// Lexer for semver tokens belonging to a range.
 #[derive(Debug)]
-pub struct RangeLexer<'input> {
+pub struct Lexer<'input> {
     input: &'input str,
     chars: str::CharIndices<'input>,
     // lookeahead
@@ -137,14 +137,14 @@ pub struct RangeLexer<'input> {
     c2: Option<(usize, char)>,
 }
 
-impl<'input> RangeLexer<'input> {
+impl<'input> Lexer<'input> {
     /// Construct a new lexer for the given input.
-    pub fn new(input: &str) -> RangeLexer {
+    pub fn new(input: &str) -> Lexer {
         let mut chars = input.char_indices();
         let c1 = chars.next();
         let c2 = chars.next();
 
-        RangeLexer {
+        Lexer {
             input: input,
             chars: chars,
             c1: c1,
@@ -199,7 +199,7 @@ impl<'input> RangeLexer<'input> {
     }
 }
 
-impl<'input> Iterator for RangeLexer<'input> {
+impl<'input> Iterator for Lexer<'input> {
     type Item = Result<Token<'input>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -262,9 +262,7 @@ mod tests {
     use super::*;
 
     fn lex(input: &str) -> Vec<Token> {
-        RangeLexer::new(input)
-            .map(Result::unwrap)
-            .collect::<Vec<_>>()
+        Lexer::new(input).map(Result::unwrap).collect::<Vec<_>>()
     }
 
     #[test]

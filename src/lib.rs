@@ -52,8 +52,8 @@
 pub mod version;
 pub mod comparator;
 pub mod range;
-pub mod range_lexer;
-pub mod range_parser;
+pub mod lexer;
+pub mod parser;
 
 // for private stuff the two share
 mod common;
