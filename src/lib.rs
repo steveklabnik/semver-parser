@@ -54,9 +54,3 @@ pub mod comparator;
 pub mod range;
 pub mod lexer;
 pub mod parser;
-
-// for private stuff the two share
-mod common;
-
-// for recognizer combinators
-mod recognize;

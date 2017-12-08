@@ -48,10 +48,9 @@
 //! [`VersionReq`]: ./struct.VersionReq.html
 //! [`version::Version`]: ../version/struct.Version.html
 
-use common::{self, numeric_identifier, letters_numbers_dash_dot};
+use parser::{self, Parser};
 use version::Identifier;
-use std::str::{FromStr, from_utf8};
-use recognize::*;
+use std::str::FromStr;
 
 /// Struct holding collection of version requirements.
 ///
@@ -234,7 +233,7 @@ impl FromStr for Op {
 /// use semver_parser::range;
 ///
 /// # fn try_main() -> Result<(), String> {
-/// let p = range::parse_predicate(">=1.1")?;
+/// let p = range::parse_predicate(">=1.1")?.expect("non-empty");
 /// assert_eq!(p.op, range::Op::GtEq);
 /// assert_eq!(p.major, 1);
 /// assert_eq!(p.minor.unwrap(), 1);
@@ -263,46 +262,6 @@ pub struct Predicate {
     pub pre: Vec<Identifier>,
 }
 
-fn numeric_or_wild(s: &[u8]) -> Option<(Option<u64>, usize)> {
-    if let Some((val, len)) = numeric_identifier(s) {
-        Some((Some(val), len))
-    } else if let Some(len) = OneOf(b"*xX").p(s) {
-        Some((None, len))
-    } else {
-        None
-    }
-}
-
-fn dot_numeric_or_wild(s: &[u8]) -> Option<(Option<u64>, usize)> {
-    b'.'.p(s).and_then(|len| {
-        numeric_or_wild(&s[len..]).map(|(val, len2)| (val, len + len2))
-    })
-}
-
-fn operation(s: &[u8]) -> Option<(Op, usize)> {
-    if let Some(len) = "=".p(s) {
-        Some((Op::Ex, len))
-    } else if let Some(len) = ">=".p(s) {
-        Some((Op::GtEq, len))
-    } else if let Some(len) = ">".p(s) {
-        Some((Op::Gt, len))
-    } else if let Some(len) = "<=".p(s) {
-        Some((Op::LtEq, len))
-    } else if let Some(len) = "<".p(s) {
-        Some((Op::Lt, len))
-    } else if let Some(len) = "~".p(s) {
-        Some((Op::Tilde, len))
-    } else if let Some(len) = "^".p(s) {
-        Some((Op::Compatible, len))
-    } else {
-        None
-    }
-}
-
-fn whitespace(s: &[u8]) -> Option<usize> {
-    ZeroOrMore(OneOf(b"\t\r\n ")).p(s)
-}
-
 /// Function parsing [`Predicate`] from string.
 ///
 /// Function parsing [`Predicate`] from string to `Result<`[`Predicate`]`, String>`,
@@ -316,7 +275,7 @@ fn whitespace(s: &[u8]) -> Option<usize> {
 /// use semver_parser::range;
 ///
 /// # fn try_main() -> Result<(), String> {
-/// let p = range::parse_predicate(">=1.1")?;
+/// let p = range::parse_predicate(">=1.1")?.expect("non-empty");
 /// assert_eq!(p.op, range::Op::GtEq);
 /// assert_eq!(p.major, 1);
 /// assert_eq!(p.minor.unwrap(), 1);
@@ -333,60 +292,17 @@ fn whitespace(s: &[u8]) -> Option<usize> {
 /// # }
 /// ```
 /// [`Predicate`]: ./struct.Predicate.html
-pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
-    let s = range.trim().as_bytes();
-    let mut i = 0;
-    let mut operation = if let Some((op, len)) = operation(&s[i..]) {
-        i += len;
-        op
-    } else {
-        // operations default to Compatible
-        Op::Compatible
-    };
-    if let Some(len) = whitespace.p(&s[i..]) {
-        i += len;
+pub fn parse_predicate<'input>(
+    input: &'input str,
+) -> Result<Option<Predicate>, parser::Error<'input>> {
+    let mut parser = Parser::new(input)?;
+    let predicate = parser.predicate()?;
+
+    if !parser.is_eof() {
+        return Err(parser::Error::MoreInput(parser.tail()?));
     }
-    let major = if let Some((major, len)) = numeric_identifier(&s[i..]) {
-        i += len;
-        major
-    } else {
-        return Err("Error parsing major version number: ".to_string());
-    };
-    let minor = if let Some((minor, len)) = dot_numeric_or_wild(&s[i..]) {
-        i += len;
-        if minor.is_none() {
-            operation = Op::Wildcard(WildcardVersion::Minor);
-        }
-        minor
-    } else {
-        None
-    };
-    let patch = if let Some((patch, len)) = dot_numeric_or_wild(&s[i..]) {
-        i += len;
-        if patch.is_none() {
-            operation = Op::Wildcard(WildcardVersion::Patch);
-        }
-        patch
-    } else {
-        None
-    };
-    let (pre, pre_len) = common::parse_optional_meta(&s[i..], b'-')?;
-    i += pre_len;
-    if let Some(len) = (b'+', letters_numbers_dash_dot).p(&s[i..]) {
-        i += len;
-    }
-    if i != s.len() {
-        return Err(
-            "Extra junk after valid predicate: ".to_string() + from_utf8(&s[i..]).unwrap(),
-        );
-    }
-    Ok(Predicate {
-        op: operation,
-        major: major,
-        minor: minor,
-        patch: patch,
-        pre: pre,
-    })
+
+    Ok(predicate)
 }
 
 /// Function for parsing [`VersionReq`] from string.
@@ -455,33 +371,15 @@ pub fn parse_predicate(range: &str) -> Result<Predicate, String> {
 /// #   try_main().unwrap();
 /// # }
 /// [`VersionReq`]: ./struct.VersionReq.html
-pub fn parse(ranges: &str) -> Result<VersionReq, String> {
-    // null is an error
-    if ranges == "\0" {
-        return Err(String::from("Null is not a valid VersionReq"));
+pub fn parse<'input>(input: &'input str) -> Result<VersionReq, parser::Error<'input>> {
+    let mut parser = Parser::new(input)?;
+    let range = parser.range()?;
+
+    if !parser.is_eof() {
+        return Err(parser::Error::MoreInput(parser.tail()?));
     }
 
-    // an empty range is a major version wildcard
-    // so is a lone * or x of either capitalization
-    if (ranges == "") || (ranges == "*") || (ranges == "x") || (ranges == "X") {
-        return Ok(VersionReq { predicates: vec![] });
-    }
-
-
-    let ranges = ranges.trim();
-
-    let predicates: Result<Vec<_>, String> = ranges
-        .split(",")
-        .map(|range| parse_predicate(range))
-        .collect();
-
-    let predicates = try!(predicates);
-
-    if predicates.len() == 0 {
-        return Err(String::from("VersionReq did not parse properly"));
-    }
-
-    Ok(VersionReq { predicates: predicates })
+    Ok(range)
 }
 
 #[cfg(test)]
