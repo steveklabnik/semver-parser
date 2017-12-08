@@ -105,7 +105,7 @@ impl<'input> Token<'input> {
     /// Check if the current token is a whitespace token.
     pub fn is_whitespace(&self) -> bool {
         match *self {
-            Whitespace(_, _) => true,
+            Whitespace(..) => true,
             _ => false,
         }
     }
@@ -132,7 +132,7 @@ pub enum Error {
 pub struct Lexer<'input> {
     input: &'input str,
     chars: str::CharIndices<'input>,
-    // lookeahead
+    // lookahead
     c1: Option<(usize, char)>,
     c2: Option<(usize, char)>,
 }
@@ -270,36 +270,62 @@ mod tests {
     }
 
     #[test]
-    pub fn all_tokens() {
+    pub fn simple_tokens() {
         assert_eq!(
-            lex("=><.^~*0.1234<=>=||"),
+            lex("=><<=>=^~*.,-+||"),
             vec![
                 Eq,
                 Gt,
                 Lt,
-                Dot,
+                LtEq,
+                GtEq,
                 Caret,
                 Tilde,
                 Star,
-                Numeric(0),
                 Dot,
-                Numeric(1234),
-                LtEq,
-                GtEq,
+                Comma,
+                Hyphen,
+                Plus,
                 Or,
             ]
         );
     }
 
     #[test]
-    pub fn empty() {
-        assert_eq!(lex(""), vec![]);
+    pub fn whitespace() {
+        assert_eq!(
+            lex("  foo \t\n\rbar"),
+            vec![
+                Whitespace(0, 2),
+                AlphaNumeric("foo"),
+                Whitespace(5, 9),
+                AlphaNumeric("bar"),
+            ]
+        );
     }
 
     #[test]
-    pub fn numeric_leading_zeros() {
-        assert_eq!(lex("0000"), vec![AlphaNumeric("0000")]);
-        assert_eq!(lex("0001"), vec![AlphaNumeric("0001")]);
+    pub fn components() {
+        assert_eq!(lex("42"), vec![Numeric(42)]);
+        assert_eq!(lex("0"), vec![Numeric(0)]);
+        assert_eq!(lex("01"), vec![AlphaNumeric("01")]);
+        assert_eq!(lex("01"), vec![AlphaNumeric("01")]);
+        assert_eq!(lex("5885644aa"), vec![AlphaNumeric("5885644aa")]);
+        assert_eq!(lex("beta2"), vec![AlphaNumeric("beta2")]);
+        assert_eq!(lex("beta.2"), vec![AlphaNumeric("beta"), Dot, Numeric(2)]);
+    }
+
+    #[test]
+    pub fn is_wildcard() {
+        assert_eq!(Star.is_wildcard(), true);
+        assert_eq!(AlphaNumeric("x").is_wildcard(), true);
+        assert_eq!(AlphaNumeric("X").is_wildcard(), true);
+        assert_eq!(AlphaNumeric("other").is_wildcard(), false);
+    }
+
+    #[test]
+    pub fn empty() {
+        assert_eq!(lex(""), vec![]);
     }
 
     #[test]
