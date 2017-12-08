@@ -123,8 +123,6 @@ impl<'input> Token<'input> {
 pub enum Error {
     /// Unexpected character.
     UnexpectedChar(char),
-    /// Encountered a span that is not a legal number.
-    IllegalNumber(usize, usize),
 }
 
 /// Lexer for semver tokens belonging to a range.
@@ -176,20 +174,29 @@ impl<'input> Lexer<'input> {
         )
     }
 
-    /// Consume a number.
-    fn number(&mut self, start: usize) -> Result<u64, Error> {
-        let end = scan_while!(self, start, '0'...'9');
+    /// Consume a component.
+    ///
+    /// A component can either be an identifier (alphanumeric) or numeric.
+    /// Does not permit leading zeroes if numeric.
+    fn component(&mut self, start: usize) -> Result<Token<'input>, Error> {
+        let end = scan_while!(self, start, '0'...'9' | 'A'...'Z' | 'a'...'z');
+        let input = &self.input[start..end];
 
-        match self.input[start..end].parse::<u64>() {
-            Ok(n) => Ok(n),
-            Err(_) => Err(IllegalNumber(start, end)),
+        let mut it = input.chars();
+        let (a, b) = (it.next(), it.next());
+
+        // exactly zero
+        if a == Some('0') && b.is_none() {
+            return Ok(Numeric(0));
         }
-    }
 
-    /// Consume an identifier.
-    fn identifier(&mut self, start: usize) -> Result<&'input str, Error> {
-        let end = scan_while!(self, start, '0'...'9' | 'A'...'Z' | 'a'...'z' | '-');
-        Ok(&self.input[start..end])
+        if a != Some('0') {
+            if let Ok(numeric) = input.parse::<u64>() {
+                return Ok(Numeric(numeric));
+            }
+        }
+
+        Ok(Identifier(input))
     }
 
     /// Consume whitespace.
@@ -236,14 +243,9 @@ impl<'input> Iterator for Lexer<'input> {
                     ',' => Comma,
                     '-' => Hyphen,
                     '+' => Plus,
-                    '0' => Numeric(0),
-                    '1'...'9' => {
+                    '0'...'9' | 'a'...'z' | 'A'...'Z' => {
                         self.step();
-                        return Some(self.number(start).map(Numeric));
-                    }
-                    'a'...'z' | 'A'...'Z' => {
-                        self.step();
-                        return Some(self.identifier(start).map(Identifier));
+                        return Some(self.component(start));
                     }
                     c => return Some(Err(UnexpectedChar(c))),
                 };
@@ -268,7 +270,7 @@ mod tests {
     #[test]
     pub fn all_tokens() {
         assert_eq!(
-            lex("=><.^~*01234<=>=||"),
+            lex("=><.^~*0.1234<=>=||"),
             vec![
                 Eq,
                 Gt,
@@ -278,6 +280,7 @@ mod tests {
                 Tilde,
                 Star,
                 Numeric(0),
+                Dot,
                 Numeric(1234),
                 LtEq,
                 GtEq,
@@ -293,14 +296,8 @@ mod tests {
 
     #[test]
     pub fn numeric_leading_zeros() {
-        assert_eq!(
-            lex("0000"),
-            vec![Numeric(0), Numeric(0), Numeric(0), Numeric(0)]
-        );
-        assert_eq!(
-            lex("0001"),
-            vec![Numeric(0), Numeric(0), Numeric(0), Numeric(1)]
-        );
+        assert_eq!(lex("0000"), vec![Identifier("0000")]);
+        assert_eq!(lex("0001"), vec![Identifier("0001")]);
     }
 
     #[test]
