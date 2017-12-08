@@ -42,6 +42,7 @@ use range::{Predicate, Op, VersionReq, WildcardVersion};
 use comparator::Comparator;
 use version::{Version, Identifier};
 use std::mem;
+use std::fmt;
 
 /// Evaluate if parser contains the given pattern as a separator, surrounded by whitespace.
 macro_rules! has_ws_separator {
@@ -80,6 +81,28 @@ pub enum Error<'input> {
 impl<'input> From<lexer::Error> for Error<'input> {
     fn from(value: lexer::Error) -> Self {
         Error::Lexer(value)
+    }
+}
+
+impl<'input> fmt::Display for Error<'input> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        use self::Error::*;
+
+        match *self {
+            UnexpectedEnd => write!(fmt, "expected more input"),
+            UnexpectedToken(ref token) => write!(fmt, "encountered unexpected token: {:?}", token),
+            Lexer(ref error) => write!(fmt, "lexer error: {:?}", error),
+            MoreInput(ref tokens) => write!(fmt, "expected end of input, but got: {:?}", tokens),
+            EmptyPredicate => write!(fmt, "encountered empty predicate"),
+            EmptyRange => write!(fmt, "encountered empty range"),
+        }
+    }
+}
+
+/// impl for backwards compatibility.
+impl<'input> From<Error<'input>> for String {
+    fn from(value: Error<'input>) -> Self {
+        value.to_string()
     }
 }
 
