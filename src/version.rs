@@ -33,11 +33,7 @@
 //! [`parse`]: ./fn.parse.html
 
 use std::fmt;
-use std::str::from_utf8;
-
-use recognize::*;
-
-use common::{self, numeric_identifier};
+use parser::{self, Parser};
 
 /// Structure representing version data.
 ///
@@ -144,53 +140,15 @@ pub enum Identifier {
 /// # }
 /// ```
 /// [`Version`]: ./struct.Version.html
-pub fn parse(version: &str) -> Result<Version, String> {
-    let s = version.trim().as_bytes();
-    let mut i = 0;
-    let major = if let Some((major, len)) = numeric_identifier(&s[i..]) {
-        i += len;
-        major
-    } else {
-        return Err("Error parsing major identifier".to_string());
-    };
-    if let Some(len) = b'.'.p(&s[i..]) {
-        i += len;
-    } else {
-        return Err("Expected dot".to_string());
+pub fn parse<'input>(input: &'input str) -> Result<Version, parser::Error<'input>> {
+    let mut parser = Parser::new(input)?;
+    let version = parser.version()?;
+
+    if !parser.is_eof() {
+        return Err(parser::Error::MoreInput(parser.tail()?));
     }
-    let minor = if let Some((minor, len)) = numeric_identifier(&s[i..]) {
-        i += len;
-        minor
-    } else {
-        return Err("Error parsing minor identifier".to_string());
-    };
-    if let Some(len) = b'.'.p(&s[i..]) {
-        i += len;
-    } else {
-        return Err("Expected dot".to_string());
-    }
-    let patch = if let Some((patch, len)) = numeric_identifier(&s[i..]) {
-        i += len;
-        patch
-    } else {
-        return Err("Error parsing patch identifier".to_string());
-    };
-    let (pre, pre_len) = common::parse_optional_meta(&s[i..], b'-')?;
-    i += pre_len;
-    let (build, build_len) = common::parse_optional_meta(&s[i..], b'+')?;
-    i += build_len;
-    if i != s.len() {
-        return Err(
-            "Extra junk after valid version: ".to_string() + from_utf8(&s[i..]).unwrap(),
-        );
-    }
-    Ok(Version {
-        major: major,
-        minor: minor,
-        patch: patch,
-        pre: pre,
-        build: build,
-    })
+
+    Ok(version)
 }
 
 impl fmt::Display for Version {
