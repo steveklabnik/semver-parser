@@ -424,7 +424,6 @@ mod tests {
         assert_eq!(expected_build, parsed.build);
     }
 
-    #[ignore]
     #[test]
     fn parse_complex_metadata_01() {
         let version = "1.2.3-1.alpha1.9+build5.7.3aedf  ";
@@ -446,7 +445,6 @@ mod tests {
         assert_eq!(expected_build, parsed.build);
     }
 
-    #[ignore]
     #[test]
     fn parse_complex_metadata_02() {
         let version = "0.4.0-beta.1+0851523";
@@ -463,7 +461,6 @@ mod tests {
         assert_eq!(expected_build, parsed.build);
     }
 
-    #[ignore]
     #[test]
     fn parse_metadata_overflow() {
         let version = "0.4.0-beta.1+98765432109876543210";
