@@ -9,7 +9,7 @@
 //! use semver_parser::parser::Parser;
 //! use semver_parser::range::Op;
 //!
-//! let mut p = Parser::new("^1").expect("a working parser");
+//! let mut p = Parser::new("^1").expect("a broken parser");
 //!
 //! assert_eq!(Ok(Op::Compatible), p.op());
 //! assert_eq!(Ok(Some(1)), p.component());
@@ -21,7 +21,7 @@
 //! use semver_parser::parser::Parser;
 //! use semver_parser::range::{Op, Predicate};
 //!
-//! let mut p = Parser::new("^1.0").expect("a working parser");
+//! let mut p = Parser::new("^1.0").expect("a broken parser");
 //!
 //! assert_eq!(Ok(Some(Predicate {
 //!     op: Op::Compatible,
@@ -31,7 +31,7 @@
 //!     pre: vec![],
 //! })), p.predicate());
 //!
-//! let mut p = Parser::new("^*").expect("a working parser");
+//! let mut p = Parser::new("^*").expect("a broken parser");
 //!
 //! assert_eq!(Ok(None), p.predicate());
 //! ```
