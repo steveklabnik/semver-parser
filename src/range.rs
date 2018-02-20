@@ -901,6 +901,33 @@ mod tests {
     }
 
     #[test]
+    pub fn test_multiple_06() {
+        let r = range::parse("<= 0.2.0 >= 0.5.0").unwrap();
+
+        assert_eq!(
+            Predicate {
+                op: Op::LtEq,
+                major: 0,
+                minor: Some(2),
+                patch: Some(0),
+                pre: Vec::new(),
+            },
+            r.predicates[0]
+        );
+
+        assert_eq!(
+            Predicate {
+                op: Op::GtEq,
+                major: 0,
+                minor: Some(5),
+                patch: Some(0),
+                pre: Vec::new(),
+            },
+            r.predicates[1]
+        );
+    }
+
+    #[test]
     fn test_parse_build_metadata_with_predicate() {
         assert_eq!(
             range::parse("^1.2.3+meta").unwrap().predicates[0].op,
