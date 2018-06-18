@@ -44,6 +44,7 @@
 //! #   try_main().unwrap();
 //! # }
 //! ```
+//!
 //! [`Predicate`]: ./struct.Predicate.html
 //! [`VersionReq`]: ./struct.VersionReq.html
 //! [`version::Version`]: ../version/struct.Version.html
@@ -116,6 +117,8 @@ use std::str::FromStr;
 /// # fn main() {
 /// #   try_main().unwrap();
 /// # }
+/// ```
+///
 /// [`Predicate`]: ./struct.Predicate.html
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct VersionReq {
@@ -370,6 +373,8 @@ pub fn parse_predicate<'input>(
 /// # fn main() {
 /// #   try_main().unwrap();
 /// # }
+/// ```
+///
 /// [`VersionReq`]: ./struct.VersionReq.html
 pub fn parse<'input>(input: &'input str) -> Result<VersionReq, parser::Error<'input>> {
     let mut parser = Parser::new(input)?;
