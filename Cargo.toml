@@ -11,7 +11,7 @@ Parsing of the semver spec.
 """
 
 keywords = ["parser", "semver", "version", "semantic"]
-categories = ["Development tools", "Parsing"]
+categories = ["development-tools", "parsing"]
 
 readme = "README.md"
 
