@@ -32,8 +32,8 @@
 //! [`Version`]: ./struct.Version.html
 //! [`parse`]: ./fn.parse.html
 
-use std::fmt;
 use parser::{self, Parser};
+use std::fmt;
 
 /// Structure representing version data.
 ///
@@ -177,8 +177,8 @@ impl fmt::Display for Identifier {
 
 #[cfg(test)]
 mod tests {
-    use version;
     use super::*;
+    use version;
 
     #[test]
     fn parse_empty() {

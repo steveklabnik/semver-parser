@@ -50,8 +50,8 @@
 //! [`version::Version`]: ../version/struct.Version.html
 
 use parser::{self, Parser};
-use version::Identifier;
 use std::str::FromStr;
+use version::Identifier;
 
 /// Struct holding collection of version requirements.
 ///
@@ -1001,7 +1001,6 @@ mod tests {
         let other = WildcardVersion::Patch;
         assert!(expect_less.lt(&other));
     }
-
 
     #[test]
     pub fn test_wildcard_partialord_le() {

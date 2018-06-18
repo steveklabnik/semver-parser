@@ -49,8 +49,8 @@
 
 #![doc(html_root_url = "https://docs.rs/semver-parser/0.8.0")]
 
-pub mod version;
 pub mod comparator;
-pub mod range;
 pub mod lexer;
 pub mod parser;
+pub mod range;
+pub mod version;
