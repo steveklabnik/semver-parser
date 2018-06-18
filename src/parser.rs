@@ -159,14 +159,14 @@ impl<'input> Parser<'input> {
 
     /// Parse an optional comma separator, then if that is present a predicate.
     pub fn comma_predicate(&mut self) -> Result<Option<Predicate>, Error<'input>> {
-        if !has_ws_separator!(self, Some(&Token::Comma)) {
-            return Ok(None);
-        }
+        let has_comma = has_ws_separator!(self, Some(&Token::Comma));
 
         if let Some(predicate) = self.predicate()? {
             Ok(Some(predicate))
-        } else {
+        } else if has_comma {
             Err(EmptyPredicate)
+        } else {
+            Ok(None)
         }
     }
 
