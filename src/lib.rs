@@ -47,7 +47,7 @@
 //! [`range::Predicate`]: ./range/struct.Predicate.html
 //! [`range::VersionReq`]: ./range/struct.VersionReq.html
 
-#![doc(html_root_url = "https://docs.rs/semver-parser/0.8.0")]
+#![doc(html_root_url = "https://docs.rs/semver-parser/0.9.0")]
 
 pub mod comparator;
 pub mod lexer;
