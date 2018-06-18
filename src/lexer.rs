@@ -35,9 +35,9 @@
 //! assert_eq!(Some(Err(Error::UnexpectedChar('/'))), l.next());
 //! ```
 
-use std::str;
-use self::Token::*;
 use self::Error::*;
+use self::Token::*;
+use std::str;
 
 macro_rules! scan_while {
     ($slf:expr, $start:expr, $first:pat $(| $rest:pat)*) => {{
@@ -113,9 +113,7 @@ impl<'input> Token<'input> {
     /// Check if the current token is a wildcard token.
     pub fn is_wildcard(&self) -> bool {
         match *self {
-            Star |
-            AlphaNumeric("X") |
-            AlphaNumeric("x") => true,
+            Star | AlphaNumeric("X") | AlphaNumeric("x") => true,
             _ => false,
         }
     }
@@ -171,9 +169,8 @@ impl<'input> Lexer<'input> {
 
     /// Access two characters.
     fn two(&mut self) -> Option<(usize, char, char)> {
-        self.c1.and_then(
-            |(start, c1)| self.c2.map(|(_, c2)| (start, c1, c2)),
-        )
+        self.c1
+            .and_then(|(start, c1)| self.c2.map(|(_, c2)| (start, c1, c2)))
     }
 
     /// Consume a component.
@@ -274,19 +271,7 @@ mod tests {
         assert_eq!(
             lex("=><<=>=^~*.,-+||"),
             vec![
-                Eq,
-                Gt,
-                Lt,
-                LtEq,
-                GtEq,
-                Caret,
-                Tilde,
-                Star,
-                Dot,
-                Comma,
-                Hyphen,
-                Plus,
-                Or,
+                Eq, Gt, Lt, LtEq, GtEq, Caret, Tilde, Star, Dot, Comma, Hyphen, Plus, Or
             ]
         );
     }

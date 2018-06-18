@@ -44,13 +44,14 @@
 //! #   try_main().unwrap();
 //! # }
 //! ```
+//!
 //! [`Predicate`]: ./struct.Predicate.html
 //! [`VersionReq`]: ./struct.VersionReq.html
 //! [`version::Version`]: ../version/struct.Version.html
 
 use parser::{self, Parser};
-use version::Identifier;
 use std::str::FromStr;
+use version::Identifier;
 
 /// Struct holding collection of version requirements.
 ///
@@ -116,6 +117,8 @@ use std::str::FromStr;
 /// # fn main() {
 /// #   try_main().unwrap();
 /// # }
+/// ```
+///
 /// [`Predicate`]: ./struct.Predicate.html
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct VersionReq {
@@ -370,6 +373,8 @@ pub fn parse_predicate<'input>(
 /// # fn main() {
 /// #   try_main().unwrap();
 /// # }
+/// ```
+///
 /// [`VersionReq`]: ./struct.VersionReq.html
 pub fn parse<'input>(input: &'input str) -> Result<VersionReq, parser::Error<'input>> {
     let mut parser = Parser::new(input)?;
@@ -996,7 +1001,6 @@ mod tests {
         let other = WildcardVersion::Patch;
         assert!(expect_less.lt(&other));
     }
-
 
     #[test]
     pub fn test_wildcard_partialord_le() {

@@ -36,13 +36,13 @@
 //! assert_eq!(Ok(None), p.predicate());
 //! ```
 
-use lexer::{self, Lexer, Token};
 use self::Error::*;
-use range::{Predicate, Op, VersionReq, WildcardVersion};
 use comparator::Comparator;
-use version::{Version, Identifier};
-use std::mem;
+use lexer::{self, Lexer, Token};
+use range::{Op, Predicate, VersionReq, WildcardVersion};
 use std::fmt;
+use std::mem;
+use version::{Identifier, Version};
 
 /// Evaluate if parser contains the given pattern as a separator, surrounded by whitespace.
 macro_rules! has_ws_separator {
@@ -56,10 +56,10 @@ macro_rules! has_ws_separator {
                 // strip suffixing whitespace.
                 $slf.skip_whitespace()?;
                 true
-            },
+            }
             _ => false,
         }
-    }}
+    }};
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -371,7 +371,9 @@ impl<'input> Parser<'input> {
             }
         }
 
-        Ok(VersionReq { predicates: predicates })
+        Ok(VersionReq {
+            predicates: predicates,
+        })
     }
 
     /// Parse a comparator.
