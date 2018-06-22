@@ -21,4 +21,4 @@ before_script:
 
 script:
   - cargo test
-  - if [ "${RUN_RUSTFMT}" = "true" ]; then cargo fmt -- --check; fi
+  - if [ "${RUN_RUSTFMT}" = "true" ]; then cargo fmt -- --write-mode=check; fi
