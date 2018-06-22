@@ -271,7 +271,7 @@ mod tests {
         assert_eq!(
             lex("=><<=>=^~*.,-+||"),
             vec![
-                Eq, Gt, Lt, LtEq, GtEq, Caret, Tilde, Star, Dot, Comma, Hyphen, Plus, Or
+                Eq, Gt, Lt, LtEq, GtEq, Caret, Tilde, Star, Dot, Comma, Hyphen, Plus, Or,
             ]
         );
     }

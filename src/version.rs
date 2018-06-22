@@ -473,9 +473,9 @@ mod tests {
         ];
         assert_eq!(expected_pre, parsed.pre);
 
-        let expected_build = vec![
-            Identifier::AlphaNumeric(String::from("98765432109876543210")),
-        ];
+        let expected_build = vec![Identifier::AlphaNumeric(String::from(
+            "98765432109876543210",
+        ))];
         assert_eq!(expected_build, parsed.build);
     }
 
