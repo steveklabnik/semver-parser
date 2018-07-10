@@ -1,24 +1,17 @@
 language: rust
 cache: cargo
 
-# this is a long way of saying, "please test 1.22.1, stable, beta, and nightly, but run rustfmt only on stable"
 matrix:
   include:
-  - rust: "1.22.1"
-    env: RUN_RUSTFMT=false
-  - rust: "stable"
-    env: RUN_RUSTFMT=true
-  - rust: "beta"
-    env: RUN_RUSTFMT=false
-  - rust: "nightly"
-    env: RUN_RUSTFMT=false
-  allow_failures:
-    # bugs may affect nightly; test so we're aware, but don't fail the build
-    - rust: nightly
 
-before_script:
-  - if [ "${RUN_RUSTFMT}" = "true" ]; then rustup component add rustfmt-preview; fi
-
-script:
-  - cargo test
-  - if [ "${RUN_RUSTFMT}" = "true" ]; then cargo fmt -- --write-mode=check; fi
+  - rust: stable
+    script:
+    - cargo test
+  - rust: beta
+    script:
+    - cargo test
+  - rust: nightly
+    script:
+    - cargo test
+    - rustup component add rustfmt-preview
+    - cargo fmt --all -- --check
