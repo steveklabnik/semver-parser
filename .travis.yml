@@ -7,11 +7,11 @@ matrix:
   - rust: stable
     script:
     - cargo test
+    - rustup component add rustfmt-preview
+    - cargo fmt --all -- --check
   - rust: beta
     script:
     - cargo test
   - rust: nightly
     script:
     - cargo test
-    - rustup component add rustfmt-preview
-    - cargo fmt --all -- --check
