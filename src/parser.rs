@@ -1,66 +1,11 @@
-//! Recursive-descent parser for semver ranges.
-//!
-//! The parsers is divided into a set of functions, each responsible for parsing a subset of the
-//! grammar.
-//!
-//! # Examples
-//!
-//! ```rust
-//! use semver_parser::parser::Parser;
-//! use semver_parser::range::Op;
-//!
-//! let mut p = Parser::new("^1").expect("a broken parser");
-//!
-//! assert_eq!(Ok(Op::Compatible), p.op());
-//! assert_eq!(Ok(Some(1)), p.component());
-//! ```
-//!
-//! Example parsing a range:
-//!
-//! ```rust
-//! use semver_parser::parser::Parser;
-//! use semver_parser::range::{Op, Predicate};
-//!
-//! let mut p = Parser::new("^1.0").expect("a broken parser");
-//!
-//! assert_eq!(Ok(Some(Predicate {
-//!     op: Op::Compatible,
-//!     major: 1,
-//!     minor: Some(0),
-//!     patch: None,
-//!     pre: vec![],
-//! })), p.predicate());
-//!
-//! let mut p = Parser::new("^*").expect("a broken parser");
-//!
-//! assert_eq!(Ok(None), p.predicate());
-//! ```
+// this is only for parsing versions now
 
-use self::Error::*;
-use comparator::Comparator;
-use lexer::{self, Lexer, Token};
-use range::{Op, Predicate, VersionReq, WildcardVersion};
 use std::fmt;
 use std::mem;
-use version::{Identifier, Version};
 
-/// Evaluate if parser contains the given pattern as a separator, surrounded by whitespace.
-macro_rules! has_ws_separator {
-    ($slf:expr, $pat:pat) => {{
-        $slf.skip_whitespace()?;
-
-        match $slf.peek() {
-            $pat => {
-                // pop the separator.
-                $slf.pop()?;
-                // strip suffixing whitespace.
-                $slf.skip_whitespace()?;
-                true
-            }
-            _ => false,
-        }
-    }};
-}
+use self::Error::*;
+use crate::lexer::{self, Lexer, Token};
+use crate::version::{Identifier, Version};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error<'input> {
@@ -155,28 +100,6 @@ impl<'input> Parser<'input> {
             Some(&Token::Whitespace(_, _)) => self.pop().map(|_| ()),
             _ => Ok(()),
         }
-    }
-
-    /// Parse an optional comma separator, then if that is present a predicate.
-    pub fn comma_predicate(&mut self) -> Result<Option<Predicate>, Error<'input>> {
-        let has_comma = has_ws_separator!(self, Some(&Token::Comma));
-
-        if let Some(predicate) = self.predicate()? {
-            Ok(Some(predicate))
-        } else if has_comma {
-            Err(EmptyPredicate)
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Parse an optional or separator `||`, then if that is present a range.
-    fn or_range(&mut self) -> Result<Option<VersionReq>, Error<'input>> {
-        if !has_ws_separator!(self, Some(&Token::Or)) {
-            return Ok(None);
-        }
-
-        Ok(Some(self.range()?))
     }
 
     /// Parse a single component.
@@ -290,104 +213,6 @@ impl<'input> Parser<'input> {
         // pop the plus.
         self.pop()?;
         self.parts()
-    }
-
-    /// Optionally parse a single operator.
-    ///
-    /// Like, `~`, or `^`.
-    pub fn op(&mut self) -> Result<Op, Error<'input>> {
-        use self::Token::*;
-
-        let op = match self.peek() {
-            Some(&Eq) => Op::Ex,
-            Some(&Gt) => Op::Gt,
-            Some(&GtEq) => Op::GtEq,
-            Some(&Lt) => Op::Lt,
-            Some(&LtEq) => Op::LtEq,
-            Some(&Tilde) => Op::Tilde,
-            Some(&Caret) => Op::Compatible,
-            // default op
-            _ => return Ok(Op::Compatible),
-        };
-
-        // remove the matched token.
-        self.pop()?;
-        self.skip_whitespace()?;
-        Ok(op)
-    }
-
-    /// Parse a single predicate.
-    ///
-    /// Like, `^1`, or `>=2.0.0`.
-    pub fn predicate(&mut self) -> Result<Option<Predicate>, Error<'input>> {
-        // empty predicate, treated the same as wildcard.
-        if self.peek().is_none() {
-            return Ok(None);
-        }
-
-        let mut op = self.op()?;
-
-        let major = match self.component()? {
-            Some(major) => major,
-            None => return Ok(None),
-        };
-
-        let (minor, minor_wildcard) = self.dot_component()?;
-        let (patch, patch_wildcard) = self.dot_component()?;
-        let pre = self.pre()?;
-
-        // TODO: avoid illegal combinations, like `1.*.0`.
-        if minor_wildcard {
-            op = Op::Wildcard(WildcardVersion::Minor);
-        }
-
-        if patch_wildcard {
-            op = Op::Wildcard(WildcardVersion::Patch);
-        }
-
-        // ignore build metadata
-        self.plus_build_metadata()?;
-
-        Ok(Some(Predicate {
-            op: op,
-            major: major,
-            minor: minor,
-            patch: patch,
-            pre: pre,
-        }))
-    }
-
-    /// Parse a single range.
-    ///
-    /// Like, `^1.0` or `>=3.0.0, <4.0.0`.
-    pub fn range(&mut self) -> Result<VersionReq, Error<'input>> {
-        let mut predicates = Vec::new();
-
-        if let Some(predicate) = self.predicate()? {
-            predicates.push(predicate);
-
-            while let Some(next) = self.comma_predicate()? {
-                predicates.push(next);
-            }
-        }
-
-        Ok(VersionReq {
-            predicates: predicates,
-        })
-    }
-
-    /// Parse a comparator.
-    ///
-    /// Like, `1.0 || 2.0` or `^1 || >=3.0.0, <4.0.0`.
-    pub fn comparator(&mut self) -> Result<Comparator, Error<'input>> {
-        let mut ranges = Vec::new();
-        ranges.push(self.range()?);
-
-        while let Some(next) = self.or_range()? {
-            ranges.push(next);
-        }
-
-        Ok(Comparator { ranges: ranges })
     }
 
     /// Parse a version.

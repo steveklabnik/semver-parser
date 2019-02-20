@@ -12,8 +12,7 @@ mod range;
 pub use crate::range::Range;
 
 // from old lib:
-// pub mod comparator;
-// pub mod lexer;
-// pub mod parser;
+pub mod lexer;
+pub mod parser;
 // pub mod range;
-// pub mod version;
+pub mod version;

@@ -32,7 +32,7 @@
 //! [`Version`]: ./struct.Version.html
 //! [`parse`]: ./fn.parse.html
 
-use parser::{self, Parser};
+use crate::parser::{self, Parser};
 use std::fmt;
 
 /// Structure representing version data.
@@ -153,14 +153,14 @@ pub fn parse<'input>(input: &'input str) -> Result<Version, parser::Error<'input
 
 impl fmt::Display for Version {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "{}.{}.{}", self.major, self.minor, self.patch));
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch).expect("write failed");
         if !self.pre.is_empty() {
             let strs: Vec<_> = self.pre.iter().map(ToString::to_string).collect();
-            try!(write!(f, "-{}", strs.join(".")));
+            write!(f, "-{}", strs.join(".")).expect("write failed");
         }
         if !self.build.is_empty() {
             let strs: Vec<_> = self.build.iter().map(ToString::to_string).collect();
-            try!(write!(f, "+{}", strs.join(".")));
+            write!(f, "+{}", strs.join(".")).expect("write failed");
         }
         Ok(())
     }
@@ -178,7 +178,7 @@ impl fmt::Display for Identifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use version;
+    use crate::version;
 
     #[test]
     fn parse_empty() {
