@@ -1,19 +1,9 @@
 [package]
 name = "semver-parser"
-version = "0.9.0" # remember to update html_root_url
+version = "0.10.0"
 authors = ["Steve Klabnik <steve@steveklabnik.com>"]
-license = "MIT/Apache-2.0"
-repository = "https://github.com/steveklabnik/semver-parser"
-homepage = "https://github.com/steveklabnik/semver-parser"
-documentation = "https://docs.rs/semver-parser"
-description = """
-Parsing of the semver spec.
-"""
+edition = "2018"
 
-keywords = ["parser", "semver", "version", "semantic"]
-categories = ["development-tools", "parsing"]
-
-readme = "README.md"
-
-[badges]
-travis-ci = { repository = "steveklabnik/semver-parser" }
+[dependencies]
+pest = "2.0.0"
+pest_derive = "2.0.0"

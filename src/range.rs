@@ -1,1054 +1,828 @@
-//! Version range and requirements data and functions (used for version comparison).
-//!
-//! This module contains [`Predicate`] struct which holds data for comparison
-//! [`version::Version`] structs: [`VersionReq`] struct as a collection of
-//! [`Predicate`]s, functions for parsing those structs and some helper data structures
-//! and functions.
-//!
-//! # Examples
-//!
-//! Parsing version range and matching it with concrete version:
-//!
-//! ```
-//! use semver_parser::range;
-//! use semver_parser::version;
-//!
-//! # fn try_main() -> Result<(), String> {
-//! let r = range::parse("1.0.0")?;
-//!
-//! assert_eq!(range::Predicate {
-//!         op: range::Op::Compatible,
-//!         major: 1,
-//!         minor: Some(0),
-//!         patch: Some(0),
-//!         pre: Vec::new(),
-//!     },
-//!     r.predicates[0]
-//! );
-//!
-//! let m = version::parse("1.0.0")?;
-//! for p in &r.predicates {
-//!     match p.op {
-//!         range::Op::Compatible => {
-//!             assert_eq!(p.major, m.major);
-//!         }
-//!         _ => {
-//!             unimplemented!();
-//!         }
-//!     }
-//! }
-//! # Ok(())
-//! # }
-//! #
-//! # fn main() {
-//! #   try_main().unwrap();
-//! # }
-//! ```
-//!
-//! [`Predicate`]: ./struct.Predicate.html
-//! [`VersionReq`]: ./struct.VersionReq.html
-//! [`version::Version`]: ../version/struct.Version.html
+use crate::*;
 
-use parser::{self, Parser};
-use std::str::FromStr;
-use version::Identifier;
-
-/// Struct holding collection of version requirements.
-///
-/// High-level collection of requirements for versions. Requirements are [`Predicate`] structs.
-///
-/// # Examples
-///
-/// Simple single-predicate `VersionReq`:
-///
-/// ```
-/// use semver_parser::range;
-///
-/// # fn try_main() -> Result<(), String> {
-/// let r = range::parse("1.0.0")?;
-///
-/// assert_eq!(range::Predicate {
-///         op: range::Op::Compatible,
-///         major: 1,
-///         minor: Some(0),
-///         patch: Some(0),
-///         pre: Vec::new(),
-///     },
-///     r.predicates[0]
-/// );
-/// # Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
-/// ```
-///
-/// Multiple predicates in `VersionReq`:
-///
-/// ```
-/// use semver_parser::range;
-///
-/// # fn try_main() -> Result<(), String> {
-/// let r = range::parse("> 0.0.9, <= 2.5.3")?;
-///
-/// assert_eq!(range::Predicate {
-///         op: range::Op::Gt,
-///         major: 0,
-///         minor: Some(0),
-///         patch: Some(9),
-///         pre: Vec::new(),
-///     },
-///     r.predicates[0]
-/// );
-///
-/// assert_eq!(range::Predicate {
-///         op: range::Op::LtEq,
-///         major: 2,
-///         minor: Some(5),
-///         patch: Some(3),
-///         pre: Vec::new(),
-///     },
-///     r.predicates[1]
-/// );
-/// # Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
-/// ```
-///
-/// [`Predicate`]: ./struct.Predicate.html
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct VersionReq {
-    /// Collection of predicates.
-    pub predicates: Vec<Predicate>,
+#[derive(Debug, PartialEq)]
+pub struct Range {
+    pub comparator_set: Vec<Comparator>,
 }
 
-/// Enum representing a `*` version part.
-///
-/// This is one of variants of the [`Op`] enum wich is part of [`Predicate`] enum.
-/// All variants represent some "match-all" cases for specific numeric parts of version.
-///
-/// # Examples
-///
-/// Parsing wildcard predicate and checking that its predicates are empty.
-///
-/// ```
-/// use semver_parser::range;
-///
-/// # fn try_main() -> Result<(), String> {
-/// let r = range::parse("*")?;
-///
-/// assert!(r.predicates.is_empty());
-/// # Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
-/// ```
-/// [`Op`]: ./enum.Op.html
-/// [`Predicate`]: ./struct.Predicate.html
-#[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Hash, Clone)]
-pub enum WildcardVersion {
-    /// Wildcard minor version `1.*.3`.
-    Minor,
-    /// Wildcard patch version `1.2.*`.
-    Patch,
-}
-
-/// Enum representing operation in [`Predicate`].
-///
-/// This enum represents an operation for comparing two [`version::Version`]s.
-///
-/// # Examples
-///
-/// Parsing `Op` from string:
-///
-/// ```
-/// use semver_parser::range;
-/// use std::str::FromStr;
-///
-/// # fn try_main() -> Result<(), String> {
-/// let exact = range::Op::from_str("=")?;
-/// assert_eq!(exact, range::Op::Ex);
-/// let gt_eq = range::Op::from_str(">=")?;
-/// assert_eq!(gt_eq, range::Op::GtEq);
-/// # Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
-/// ```
-/// [`Predicate`]: ./struct.Predicate.html
-/// [`version::Version`]: ../version/struct.Version.html
-#[derive(PartialOrd, Ord, PartialEq, Eq, Debug, Clone, Hash)]
-pub enum Op {
-    /// Exact, `=`.
-    Ex,
-    /// Greater than, `>`.
-    Gt,
-    /// Greater than or equal to, `>=`.
-    GtEq,
-    /// Less than, `<`.
-    Lt,
-    /// Less than or equal to, `<=`.
-    LtEq,
-    /// [Tilde](http://doc.crates.io/specifying-dependencies.html#tilde-requirements)
-    /// requirements, like `~1.0.0` - a minimal version with some ability to update.
-    Tilde,
-    /// [Compatible](http://doc.crates.io/specifying-dependencies.html#caret-requirements)
-    /// by definition of semver, indicated by `^`.
-    Compatible,
-    /// `x.y.*`, `x.*`, `*`.
-    Wildcard(WildcardVersion),
-}
-
-impl FromStr for Op {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Op, String> {
-        match s {
-            "=" => Ok(Op::Ex),
-            ">" => Ok(Op::Gt),
-            ">=" => Ok(Op::GtEq),
-            "<" => Ok(Op::Lt),
-            "<=" => Ok(Op::LtEq),
-            "~" => Ok(Op::Tilde),
-            "^" => Ok(Op::Compatible),
-            _ => Err(String::from("Could not parse Op")),
-        }
-    }
-}
-
-/// Struct representing a version comparison predicate.
-///
-/// Struct contaions operation code and data for comparison of [`version::Version`]s.
-///
-/// # Examples
-///
-/// Parsing [`Predicate`] from string and checking its fields:
-///
-/// ```
-/// use semver_parser::range;
-///
-/// # fn try_main() -> Result<(), String> {
-/// let p = range::parse_predicate(">=1.1")?.expect("non-empty");
-/// assert_eq!(p.op, range::Op::GtEq);
-/// assert_eq!(p.major, 1);
-/// assert_eq!(p.minor.unwrap(), 1);
-/// assert!(p.patch.is_none());
-/// assert!(p.pre.is_empty());
-/// # Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
-/// ```
-/// [`Predicate`]: ./struct.Predicate.html
-/// [`version::Version`]: ../version/struct.Version.html
-#[derive(PartialEq, Eq, Debug, Clone, Hash, PartialOrd, Ord)]
-pub struct Predicate {
-    /// Operation code for this predicate, like "greater than" or "exact match".
+#[derive(Clone, Debug, PartialEq)]
+pub struct Comparator {
     pub op: Op,
-    /// Major version.
     pub major: u64,
-    /// Optional minor version.
-    pub minor: Option<u64>,
-    /// Optional patch version.
-    pub patch: Option<u64>,
-    /// Collection of `Identifier`s of version, like `"alpha1"` in `"1.2.3-alpha1"`.
+    pub minor: u64,
+    pub patch: u64,
     pub pre: Vec<Identifier>,
 }
 
-/// Function parsing [`Predicate`] from string.
-///
-/// Function parsing [`Predicate`] from string to `Result<`[`Predicate`]`, String>`,
-/// where `Err` will contain error message in case of failed parsing.
-///
-/// # Examples
-///
-/// Parsing [`Predicate`] from string and cheking its fields:
-///
-/// ```
-/// use semver_parser::range;
-///
-/// # fn try_main() -> Result<(), String> {
-/// let p = range::parse_predicate(">=1.1")?.expect("non-empty");
-/// assert_eq!(p.op, range::Op::GtEq);
-/// assert_eq!(p.major, 1);
-/// assert_eq!(p.minor.unwrap(), 1);
-/// assert!(p.patch.is_none());
-/// assert!(p.pre.is_empty());
-///
-/// let f = range::parse_predicate("not-a-version-predicate");
-/// assert!(f.is_err());
-/// # Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
-/// ```
-/// [`Predicate`]: ./struct.Predicate.html
-pub fn parse_predicate<'input>(
-    input: &'input str,
-) -> Result<Option<Predicate>, parser::Error<'input>> {
-    let mut parser = Parser::new(input)?;
-    let predicate = parser.predicate()?;
-
-    if !parser.is_eof() {
-        return Err(parser::Error::MoreInput(parser.tail()?));
-    }
-
-    Ok(predicate)
+#[derive(Clone, Debug, PartialEq)]
+pub enum Op {
+    Lt,
+    Lte,
+    Gt,
+    Gte,
+    Eq,
 }
 
-/// Function for parsing [`VersionReq`] from string.
-///
-/// Function for parsing [`VersionReq`] from string to `Result<`[`VersionReq`]`, String>`,
-/// where `Err` will contain error message in case of failed parsing.
-///
-/// # Examples
-///
-/// Simple single-predicate [`VersionReq`]:
-///
-/// ```
-/// use semver_parser::range;
-///
-/// # fn try_main() -> Result<(), String> {
-/// let r = range::parse("1.0.0")?;
-///
-/// assert_eq!(range::Predicate {
-///         op: range::Op::Compatible,
-///         major: 1,
-///         minor: Some(0),
-///         patch: Some(0),
-///         pre: Vec::new(),
-///     },
-///     r.predicates[0]
-/// );
-/// # Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
-/// ```
-///
-/// Multiple predicates in [`VersionReq`]:
-///
-/// ```
-/// use semver_parser::range;
-///
-/// # fn try_main() -> Result<(), String> {
-/// let r = range::parse("> 0.0.9, <= 2.5.3")?;
-///
-/// assert_eq!(range::Predicate {
-///         op: range::Op::Gt,
-///         major: 0,
-///         minor: Some(0),
-///         patch: Some(9),
-///         pre: Vec::new(),
-///     },
-///     r.predicates[0]
-/// );
-///
-/// assert_eq!(range::Predicate {
-///         op: range::Op::LtEq,
-///         major: 2,
-///         minor: Some(5),
-///         patch: Some(3),
-///         pre: Vec::new(),
-///     },
-///     r.predicates[1]
-/// );
-/// # Ok(())
-/// # }
-/// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
-/// ```
-///
-/// [`VersionReq`]: ./struct.VersionReq.html
-pub fn parse<'input>(input: &'input str) -> Result<VersionReq, parser::Error<'input>> {
-    let mut parser = Parser::new(input)?;
-    let range = parser.range()?;
+#[derive(Clone, Debug, PartialEq)]
+pub enum Identifier {
+    Numeric(u64),
+    AlphaNumeric(String),
+}
 
-    if !parser.is_eof() {
-        return Err(parser::Error::MoreInput(parser.tail()?));
+#[derive(Clone, Debug, PartialEq)]
+pub struct Partial {
+    major: Option<u64>,
+    minor: Option<u64>,
+    patch: Option<u64>,
+    pre: Vec<Identifier>,
+    kind: PartialKind,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum PartialKind {
+    XRangeOnly,
+    MajorOnly,
+    MajorMinor,
+    MajorMinorPatch,
+}
+
+impl Partial {
+    pub fn new() -> Self {
+        Self {
+            major: None,
+            minor: None,
+            patch: None,
+            pre: Vec::new(),
+            kind: PartialKind::XRangeOnly,
+        }
     }
 
-    Ok(range)
+    pub fn as_comparator(&self, op: Op) -> Comparator {
+        Comparator {
+            op: op,
+            major: self.major.unwrap_or(0),
+            minor: self.minor.unwrap_or(0),
+            patch: self.patch.unwrap_or(0),
+            pre: self.pre.clone(),
+        }
+    }
+
+    pub fn inc_major(&mut self) -> &mut Self {
+        self.major = Some(self.major.unwrap_or(0) + 1);
+        self
+    }
+
+    pub fn inc_minor(&mut self) -> &mut Self {
+        self.minor = Some(self.minor.unwrap_or(0) + 1);
+        self
+    }
+
+    pub fn inc_patch(&mut self) -> &mut Self {
+        self.patch = Some(self.patch.unwrap_or(0) + 1);
+        self
+    }
+
+    pub fn zero_missing(&mut self) -> &mut Self {
+        self.major = Some(self.major.unwrap_or(0));
+        self.minor = Some(self.minor.unwrap_or(0));
+        self.patch = Some(self.patch.unwrap_or(0));
+        self
+    }
+
+    pub fn zero_minor(&mut self) -> &mut Self {
+        self.minor = Some(0);
+        self
+    }
+
+    pub fn zero_patch(&mut self) -> &mut Self {
+        self.patch = Some(0);
+        self
+    }
+
+    pub fn no_pre(&mut self) -> &mut Self {
+        self.pre = Vec::new();
+        self
+    }
+}
+
+pub fn from_pair_iterator(
+    parsed_range: pest::iterators::Pair<'_, Rule>,
+    compat: &range_set::Compat,
+) -> Result<Range, String> {
+    // First of all, do we have the correct iterator?
+    if parsed_range.as_rule() != Rule::range {
+        return Err(String::from("Error parsing range"));
+    }
+
+    let mut comparator_set = Vec::new();
+
+    // Now we need to parse each comparator set out of the range
+    for record in parsed_range.into_inner() {
+        match record.as_rule() {
+            Rule::hyphen => {
+                let mut hyphen_set = simple::from_hyphen_range(record)?;
+                comparator_set.append(&mut hyphen_set);
+            }
+            Rule::simple => {
+                let mut comparators = simple::from_pair_iterator(record, &compat)?;
+                comparator_set.append(&mut comparators);
+            }
+            Rule::empty => {
+                comparator_set.push(Partial::new().zero_missing().as_comparator(Op::Gte));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    Ok(Range { comparator_set })
+}
+
+pub mod simple {
+    use super::*;
+
+    pub fn from_pair_iterator(
+        parsed_simple: pest::iterators::Pair<'_, Rule>,
+        compat: &range_set::Compat,
+    ) -> Result<Vec<Comparator>, String> {
+        // First of all, do we have the correct iterator?
+        if parsed_simple.as_rule() != Rule::simple {
+            return Err(String::from("Error parsing comparator set"));
+        }
+
+        let mut comparators = Vec::new();
+
+        // Now we need to parse each comparator set out of the range
+        for record in parsed_simple.into_inner() {
+            match record.as_rule() {
+                Rule::partial => {
+                    let components: Vec<_> = record.into_inner().collect();
+
+                    let mut partial = parse_partial(components);
+
+                    match partial.kind {
+                        PartialKind::XRangeOnly => {
+                            // '*', 'x', 'X' --> ">=0.0.0"
+                            comparators.push(partial.zero_missing().as_comparator(Op::Gte));
+                        }
+                        PartialKind::MajorOnly => {
+                            // "1", "1.*", or "1.*.*" --> ">=1.0.0 <2.0.0"
+                            // "1.*.3" == "1.*"
+                            comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
+                            comparators
+                                .push(partial.inc_major().zero_missing().as_comparator(Op::Lt));
+                        }
+                        PartialKind::MajorMinor => {
+                            // "1.2" or "1.2.*" --> ">=1.2.0 <1.3.0"
+                            comparators.push(partial.clone().zero_patch().as_comparator(Op::Gte));
+                            comparators
+                                .push(partial.inc_minor().zero_patch().as_comparator(Op::Lt));
+                        }
+                        PartialKind::MajorMinorPatch => {
+                            match compat {
+                                range_set::Compat::Node => {
+                                    // for node, "1.2.3" is "=1.2.3"
+                                    comparators.push(partial.as_comparator(Op::Eq));
+                                }
+                                range_set::Compat::Cargo => {
+                                    // for cargo, "1.2.3" --> ">=1.2.3 <2.0.0"
+                                    comparators.push(partial.clone().as_comparator(Op::Gte));
+                                    comparators.push(
+                                        partial
+                                            .inc_major()
+                                            .zero_minor()
+                                            .zero_patch()
+                                            .as_comparator(Op::Lt),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                Rule::primitive => {
+                    let mut components: Vec<_> = record.into_inner().collect();
+                    let op_component = components.remove(0);
+
+                    let op = match op_component.as_str() {
+                        "=" => Op::Eq,
+                        "<" => Op::Lt,
+                        "<=" => Op::Lte,
+                        ">" => Op::Gt,
+                        ">=" => Op::Gte,
+                        _ => unreachable!(),
+                    };
+
+                    let partial_component = components.remove(0);
+                    let components: Vec<_> = partial_component.into_inner().collect();
+                    let mut partial = parse_partial(components);
+
+                    // equal is different because it can be a range with 2 comparators
+                    if op == Op::Eq {
+                        match partial.kind {
+                            PartialKind::XRangeOnly => {
+                                // '=*' --> ">=0.0.0"
+                                comparators.push(partial.zero_missing().as_comparator(Op::Gte));
+                            }
+                            PartialKind::MajorOnly => {
+                                // "=1", "=1.*", or "=1.*.*" --> ">=1.0.0 <2.0.0"
+                                comparators
+                                    .push(partial.clone().zero_missing().as_comparator(Op::Gte));
+                                comparators
+                                    .push(partial.inc_major().zero_missing().as_comparator(Op::Lt));
+                            }
+                            PartialKind::MajorMinor => {
+                                // "=1.2" or "=1.2.*" --> ">=1.2.0 <1.3.0"
+                                comparators
+                                    .push(partial.clone().zero_patch().as_comparator(Op::Gte));
+                                comparators
+                                    .push(partial.inc_minor().zero_patch().as_comparator(Op::Lt));
+                            }
+                            PartialKind::MajorMinorPatch => {
+                                comparators.push(partial.as_comparator(Op::Eq));
+                            }
+                        }
+                    } else {
+                        match partial.kind {
+                            PartialKind::XRangeOnly => {
+                                match op {
+                                    Op::Eq => comparators
+                                        .push(partial.zero_missing().as_comparator(Op::Gte)),
+                                    Op::Lt => comparators
+                                        .push(partial.zero_missing().as_comparator(Op::Lt)),
+                                    Op::Lte => comparators
+                                        .push(partial.zero_missing().as_comparator(Op::Gte)),
+                                    Op::Gt => comparators
+                                        .push(partial.zero_missing().as_comparator(Op::Lt)),
+                                    Op::Gte => comparators
+                                        .push(partial.zero_missing().as_comparator(Op::Gte)),
+                                }
+                            }
+                            PartialKind::MajorOnly => {
+                                // ">1", "=1", etc.
+                                // ">1.*.3" == ">1.*"
+                                comparators.push(partial.zero_missing().as_comparator(op));
+                            }
+                            PartialKind::MajorMinor => {
+                                // ">1.2", "<1.2.*", etc.
+                                comparators.push(partial.zero_patch().as_comparator(op));
+                            }
+                            PartialKind::MajorMinorPatch => {
+                                comparators.push(partial.as_comparator(op));
+                            }
+                        }
+                    }
+                }
+                Rule::caret => {
+                    let mut components: Vec<_> = record.into_inner().collect();
+
+                    let partial_component = components.remove(0);
+                    let components: Vec<_> = partial_component.into_inner().collect();
+                    let mut partial = parse_partial(components);
+
+                    // major version 0 is a special case for caret
+                    if partial.major == Some(0) {
+                        match partial.kind {
+                            PartialKind::XRangeOnly => unreachable!(),
+                            PartialKind::MajorOnly => {
+                                // "^0", "^0.*" --> ">=0.0.0 <1.0.0"
+                                comparators
+                                    .push(partial.clone().zero_missing().as_comparator(Op::Gte));
+                                comparators.push(
+                                    partial
+                                        .inc_major()
+                                        .zero_missing()
+                                        .no_pre()
+                                        .as_comparator(Op::Lt),
+                                );
+                            }
+                            PartialKind::MajorMinor => {
+                                // "^0.2", "^0.2.*" --> ">=0.2.0 <0.3.0"
+                                comparators
+                                    .push(partial.clone().zero_missing().as_comparator(Op::Gte));
+                                comparators.push(
+                                    partial
+                                        .inc_minor()
+                                        .zero_patch()
+                                        .no_pre()
+                                        .as_comparator(Op::Lt),
+                                );
+                            }
+                            PartialKind::MajorMinorPatch => {
+                                if partial.minor == Some(0) {
+                                    // "^0.0.1" --> ">=0.0.1 <0.0.2"
+                                    comparators.push(partial.clone().as_comparator(Op::Gte));
+                                    comparators
+                                        .push(partial.inc_patch().no_pre().as_comparator(Op::Lt));
+                                } else {
+                                    // "^0.2.3" --> ">=0.2.3 <0.3.0"
+                                    comparators.push(partial.clone().as_comparator(Op::Gte));
+                                    comparators.push(
+                                        partial
+                                            .inc_minor()
+                                            .zero_patch()
+                                            .no_pre()
+                                            .as_comparator(Op::Lt),
+                                    );
+                                }
+                            }
+                        }
+                    } else {
+                        match partial.kind {
+                            PartialKind::XRangeOnly => {
+                                // "^*" --> ">=0.0.0"
+                                comparators.push(partial.zero_missing().as_comparator(Op::Gte));
+                            }
+                            _ => {
+                                // "^1", "^1.*" --> ">=1.0.0 <2.0.0"
+                                // "^1.2", "^1.2.*" --> ">=1.2.0 <2.0.0"
+                                // "^1.2.3" --> ">=1.2.3 <2.0.0"
+                                comparators
+                                    .push(partial.clone().zero_missing().as_comparator(Op::Gte));
+                                comparators.push(
+                                    partial
+                                        .inc_major()
+                                        .zero_minor()
+                                        .zero_patch()
+                                        .no_pre()
+                                        .as_comparator(Op::Lt),
+                                );
+                            }
+                        }
+                    }
+                }
+                Rule::tilde => {
+                    let mut components: Vec<_> = record.into_inner().collect();
+
+                    let partial_component = components.remove(0);
+                    let components: Vec<_> = partial_component.into_inner().collect();
+                    let mut partial = parse_partial(components);
+
+                    comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
+
+                    match partial.kind {
+                        PartialKind::XRangeOnly => {
+                            // "~*" --> ">=0.0.0"
+                            // which has already been added, so nothing to do here
+                        }
+                        PartialKind::MajorOnly => {
+                            // "~0" --> ">=0.0.0 <1.0.0"
+                            comparators.push(
+                                partial
+                                    .inc_major()
+                                    .zero_missing()
+                                    .no_pre()
+                                    .as_comparator(Op::Lt),
+                            );
+                        }
+                        PartialKind::MajorMinor | PartialKind::MajorMinorPatch => {
+                            // "~1.2" --> ">=1.2.0 <1.3.0"
+                            // "~1.2.3" --> ">=1.2.3 <1.3.0"
+                            comparators.push(
+                                partial
+                                    .inc_minor()
+                                    .zero_patch()
+                                    .no_pre()
+                                    .as_comparator(Op::Lt),
+                            );
+                        }
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        Ok(comparators)
+    }
+
+    pub fn from_hyphen_range(
+        parsed_simple: pest::iterators::Pair<'_, Rule>,
+    ) -> Result<Vec<Comparator>, String> {
+        // First of all, do we have the correct iterator?
+        if parsed_simple.as_rule() != Rule::hyphen {
+            return Err(String::from("Error parsing comparator set"));
+        }
+
+        let mut comparators = Vec::new();
+
+        // At this point, we have 2 partial records
+        let mut records = parsed_simple.into_inner();
+
+        let components1: Vec<_> = records.next().unwrap().into_inner().collect();
+        let mut partial1 = parse_partial(components1);
+        match partial1.kind {
+            PartialKind::XRangeOnly => {
+                // don't need to include this - the range will be limited by the 2nd part of hyphen
+                // range
+            }
+            _ => comparators.push(partial1.zero_missing().as_comparator(Op::Gte)),
+        }
+
+        let components2: Vec<_> = records.next().unwrap().into_inner().collect();
+        let mut partial2 = parse_partial(components2);
+
+        match partial2.kind {
+            PartialKind::XRangeOnly => {
+                // only include this if the first part of the hyphen range was also '*'
+                if partial1.kind == PartialKind::XRangeOnly {
+                    comparators.push(partial2.zero_missing().as_comparator(Op::Gte));
+                }
+            }
+            PartialKind::MajorOnly => {
+                // "1.2.3 - 2" --> ">=1.2.3 <3.0.0"
+                comparators.push(
+                    partial2
+                        .inc_major()
+                        .zero_minor()
+                        .zero_patch()
+                        .as_comparator(Op::Lt),
+                );
+            }
+            PartialKind::MajorMinor => {
+                // "1.2.3 - 2.3.x" --> ">=1.2.3 <2.4.0"
+                comparators.push(partial2.inc_minor().zero_patch().as_comparator(Op::Lt));
+            }
+            PartialKind::MajorMinorPatch => {
+                // "1.2.3 - 2.3.4" --> ">=1.2.3 <=2.3.4"
+                comparators.push(partial2.as_comparator(Op::Lte));
+            }
+        }
+
+        Ok(comparators)
+    }
+
+    fn parse_partial(mut components: Vec<pest::iterators::Pair<'_, Rule>>) -> Partial {
+        let mut partial = Partial::new();
+
+        // there will be at least one component
+        let one = components.remove(0);
+
+        match one.as_rule() {
+            Rule::xr => {
+                let inner = one.into_inner().next().unwrap();
+                match inner.as_rule() {
+                    Rule::xr_op => {
+                        // for "*", ">=*", etc.
+                        partial.major = None;
+                        partial.kind = PartialKind::XRangeOnly;
+                        // end the pattern here
+                        return partial;
+                    }
+                    Rule::nr => {
+                        partial.major = Some(inner.as_str().parse::<u64>().unwrap());
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        }
+
+        if components.is_empty() {
+            // only the major has been given
+            partial.kind = PartialKind::MajorOnly;
+            return partial;
+        } else {
+            let two = components.remove(0);
+
+            match two.as_rule() {
+                Rule::xr => {
+                    let inner = two.into_inner().next().unwrap();
+                    match inner.as_rule() {
+                        Rule::xr_op => {
+                            partial.minor = None;
+                            // only the major has been given, minor is xrange (ignore anything after)
+                            partial.kind = PartialKind::MajorOnly;
+                            return partial;
+                        }
+                        Rule::nr => {
+                            partial.minor = Some(inner.as_str().parse::<u64>().unwrap());
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        if components.is_empty() {
+            // only major and minor have been given
+            partial.kind = PartialKind::MajorMinor;
+            return partial;
+        } else {
+            let three = components.remove(0);
+
+            match three.as_rule() {
+                Rule::xr => {
+                    let inner = three.into_inner().next().unwrap();
+                    match inner.as_rule() {
+                        Rule::xr_op => {
+                            partial.patch = None;
+                            // only major and minor have been given, patch is xrange
+                            partial.kind = PartialKind::MajorMinor;
+                            return partial;
+                        }
+                        Rule::nr => {
+                            partial.patch = Some(inner.as_str().parse::<u64>().unwrap());
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        // at this point we at least have all three fields
+        partial.kind = PartialKind::MajorMinorPatch;
+
+        if !components.is_empty() {
+            // there's only going to be one, let's move it out
+            let pre = components.remove(0);
+            // now we want to look at the inner bit, so that we don't have the leading -
+            let mut pre: Vec<_> = pre.into_inner().collect();
+            let pre = pre.remove(0);
+            let pre = pre.as_str();
+
+            // now we have all of the stuff in pre, so we split by . to get each bit
+            for bit in pre.split('.') {
+                let identifier = match bit.parse::<u64>() {
+                    Ok(num) => Identifier::Numeric(num),
+                    Err(_) => Identifier::AlphaNumeric(bit.to_string()),
+                };
+
+                partial.pre.push(identifier);
+            }
+        }
+
+        partial
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use range;
-    use version::Identifier;
+    use pest::Parser;
 
-    #[test]
-    fn test_parsing_wildcards() {
-        assert_eq!(
-            Op::Wildcard(WildcardVersion::Patch),
-            range::parse("1.0.*").unwrap().predicates[0].op
-        );
-        assert_eq!(
-            Op::Wildcard(WildcardVersion::Patch),
-            range::parse("1.*.*").unwrap().predicates[0].op
-        );
-        assert_eq!(
-            Op::Wildcard(WildcardVersion::Minor),
-            parse("1.*.0").unwrap().predicates[0].op
-        );
+    fn parse_range(input: &str) -> pest::iterators::Pair<'_, Rule> {
+        match SemverParser::parse(Rule::range, input) {
+            Ok(mut parsed) => match parsed.next() {
+                Some(parsed) => parsed,
+                None => panic!("Could not parse {}", input),
+            },
+            Err(e) => panic!("Parse error:\n{}", e),
+        }
     }
 
-    #[test]
-    fn test_parsing_default() {
-        let r = range::parse("1.0.0").unwrap();
+    // macros to handle the test boilerplate
 
-        assert_eq!(
-            Predicate {
-                op: Op::Compatible,
-                major: 1,
-                minor: Some(0),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
+    macro_rules! range_tests {
+        ( $( $name:ident: $value:expr, )* ) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (input, expected_range) = $value;
+
+                    let parsed_range = parse_range(input);
+                    let range = from_pair_iterator(parsed_range, &range_set::Compat::Cargo).expect("parsing failed");
+
+                    // get the expected length from the input range
+                    let num_comparators = range.comparator_set.len();
+                    let expected_comparators = expected_range.comparator_set.len();
+                    assert_eq!(expected_comparators, num_comparators, "expected number of comparators: {}, got: {}", expected_comparators, num_comparators);
+
+                    assert_eq!(range, expected_range);
+                }
+             )*
+        };
     }
 
-    #[test]
-    fn test_parsing_exact_01() {
-        let r = range::parse("=1.0.0").unwrap();
+    macro_rules! range_tests_nodecompat {
+        ( $( $name:ident: $value:expr, )* ) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (input, expected_range) = $value;
 
-        assert_eq!(
-            Predicate {
-                op: Op::Ex,
-                major: 1,
-                minor: Some(0),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
+                    let parsed_range = parse_range(input);
+                    let range = from_pair_iterator(parsed_range, &range_set::Compat::Node).expect("parsing failed");
+
+                    // get the expected length from the input range
+                    let num_comparators = range.comparator_set.len();
+                    let expected_comparators = expected_range.comparator_set.len();
+                    assert_eq!(expected_comparators, num_comparators, "expected number of comparators: {}, got: {}", expected_comparators, num_comparators);
+
+                    assert_eq!(range, expected_range);
+                }
+             )*
+        };
     }
 
-    #[test]
-    fn test_parsing_exact_02() {
-        let r = range::parse("=0.9.0").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Ex,
-                major: 0,
-                minor: Some(9),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
+    macro_rules! comp_sets {
+        ( $( [$op:expr, $major:expr, $minor:expr, $patch:expr] ),* ) => {
+            Range {
+                comparator_set: vec![
+                    $(
+                        Comparator {
+                            op: $op,
+                            major: $major,
+                            minor: $minor,
+                            patch: $patch,
+                            pre: pre!(None),
+                        },
+                    )*
+                ]}
+        };
+        // if you specify pre for one item, you have to do it for all of them
+        ( $( [$op:expr, $major:expr, $minor:expr, $patch:expr, $pre:expr] ),* ) => {
+            Range {
+                comparator_set: vec![
+                    $(
+                        Comparator {
+                            op: $op,
+                            major: $major,
+                            minor: $minor,
+                            patch: $patch,
+                            pre: $pre,
+                        },
+                    )*
+                ]}
+        };
     }
 
-    #[test]
-    fn test_parsing_exact_03() {
-        let r = range::parse("=0.1.0-beta2.a").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Ex,
-                major: 0,
-                minor: Some(1),
-                patch: Some(0),
-                pre: vec![
-                    Identifier::AlphaNumeric(String::from("beta2")),
-                    Identifier::AlphaNumeric(String::from("a")),
-                ],
-            },
-            r.predicates[0]
-        );
+    macro_rules! id_num {
+        ( $num:expr ) => {
+            Identifier::Numeric($num)
+        };
     }
 
-    #[test]
-    pub fn test_parsing_greater_than() {
-        let r = range::parse("> 1.0.0").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Gt,
-                major: 1,
-                minor: Some(0),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
+    macro_rules! id_alpha {
+        ( $alpha:expr ) => {
+            Identifier::AlphaNumeric(String::from($alpha))
+        };
     }
 
-    #[test]
-    pub fn test_parsing_greater_than_01() {
-        let r = range::parse(">= 1.0.0").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::GtEq,
-                major: 1,
-                minor: Some(0),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
+    macro_rules! pre {
+        ( None ) => {
+            Vec::new()
+        };
+        ( $( $e:expr ),* ) => {
+            vec![
+                $(
+                    $e,
+                )*
+            ]
+        };
     }
 
-    #[test]
-    pub fn test_parsing_greater_than_02() {
-        let r = range::parse(">= 2.1.0-alpha2").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::GtEq,
-                major: 2,
-                minor: Some(1),
-                patch: Some(0),
-                pre: vec![Identifier::AlphaNumeric(String::from("alpha2"))],
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    pub fn test_parsing_less_than() {
-        let r = range::parse("< 1.0.0").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Lt,
-                major: 1,
-                minor: Some(0),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    pub fn test_parsing_less_than_eq() {
-        let r = range::parse("<= 2.1.0-alpha2").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::LtEq,
-                major: 2,
-                minor: Some(1),
-                patch: Some(0),
-                pre: vec![Identifier::AlphaNumeric(String::from("alpha2"))],
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    pub fn test_parsing_tilde() {
-        let r = range::parse("~1").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Tilde,
-                major: 1,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    pub fn test_parsing_compatible() {
-        let r = range::parse("^0").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Compatible,
-                major: 0,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    fn test_parsing_blank() {
-        let r = range::parse("").unwrap();
-        assert!(r.predicates.is_empty());
-    }
-
-    #[test]
-    fn test_parsing_wildcard() {
-        let r = range::parse("*").unwrap();
-        assert!(r.predicates.is_empty());
-    }
-
-    #[test]
-    fn test_uppercase_prereleases() {
-        assert_eq!(
-            vec![Identifier::AlphaNumeric("Foo".to_string())],
-            range::parse("0-Foo").unwrap().predicates[0].pre
-        );
-
-        assert_eq!(
-            vec![Identifier::AlphaNumeric("X".to_string())],
-            range::parse("0-X").unwrap().predicates[0].pre
-        );
-    }
-
-    #[test]
-    fn test_empty_prerelease() {
-        assert!(range::parse("0-").is_err());
-    }
-
-    #[test]
-    fn test_parsing_x() {
-        let r = range::parse("x").unwrap();
-        assert!(r.predicates.is_empty());
-    }
-
-    #[test]
-    fn test_parsing_capital_x() {
-        let r = range::parse("X").unwrap();
-        assert!(r.predicates.is_empty());
-    }
-
-    /// TODO: this should probably be using WildcardVersion::Minor
-    #[test]
-    fn test_parsing_wildcard_star_star() {
-        let r = range::parse("1.*.*").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Wildcard(WildcardVersion::Patch),
-                major: 1,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    fn test_parsing_minor_wildcard_star() {
-        let r = range::parse("1.*").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Wildcard(WildcardVersion::Minor),
-                major: 1,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    fn test_parsing_minor_wildcard_star_patch() {
-        let r = range::parse("1.*.0").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Wildcard(WildcardVersion::Minor),
-                major: 1,
-                minor: None,
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    fn test_parsing_minor_wildcard_x() {
-        let r = range::parse("1.x").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Wildcard(WildcardVersion::Minor),
-                major: 1,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    fn test_parsing_minor_wildcard_capital_x() {
-        let r = range::parse("1.X").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Wildcard(WildcardVersion::Minor),
-                major: 1,
-                minor: None,
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    fn test_parsing_patch_wildcard_star() {
-        let r = range::parse("1.2.*").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Wildcard(WildcardVersion::Patch),
-                major: 1,
-                minor: Some(2),
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    fn test_parsing_patch_wildcard_x() {
-        let r = range::parse("1.2.x").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Wildcard(WildcardVersion::Patch),
-                major: 1,
-                minor: Some(2),
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    fn test_parsing_patch_wildcard_capital_x() {
-        let r = range::parse("1.2.X").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Wildcard(WildcardVersion::Patch),
-                major: 1,
-                minor: Some(2),
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-    }
-
-    #[test]
-    pub fn test_multiple_01() {
-        let r = range::parse("> 0.0.9, <= 2.5.3").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Gt,
-                major: 0,
-                minor: Some(0),
-                patch: Some(9),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-
-        assert_eq!(
-            Predicate {
-                op: Op::LtEq,
-                major: 2,
-                minor: Some(5),
-                patch: Some(3),
-                pre: Vec::new(),
-            },
-            r.predicates[1]
-        );
-    }
-
-    #[test]
-    pub fn test_multiple_02() {
-        let r = range::parse("0.3.0, 0.4.0").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Compatible,
-                major: 0,
-                minor: Some(3),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-
-        assert_eq!(
-            Predicate {
-                op: Op::Compatible,
-                major: 0,
-                minor: Some(4),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[1]
-        );
-    }
-
-    #[test]
-    pub fn test_multiple_03() {
-        let r = range::parse("<= 0.2.0, >= 0.5.0").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::LtEq,
-                major: 0,
-                minor: Some(2),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-
-        assert_eq!(
-            Predicate {
-                op: Op::GtEq,
-                major: 0,
-                minor: Some(5),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[1]
-        );
-    }
-
-    #[test]
-    pub fn test_multiple_04() {
-        let r = range::parse("0.1.0, 0.1.4, 0.1.6").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::Compatible,
-                major: 0,
-                minor: Some(1),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-
-        assert_eq!(
-            Predicate {
-                op: Op::Compatible,
-                major: 0,
-                minor: Some(1),
-                patch: Some(4),
-                pre: Vec::new(),
-            },
-            r.predicates[1]
-        );
-
-        assert_eq!(
-            Predicate {
-                op: Op::Compatible,
-                major: 0,
-                minor: Some(1),
-                patch: Some(6),
-                pre: Vec::new(),
-            },
-            r.predicates[2]
-        );
-    }
-
-    #[test]
-    pub fn test_multiple_05() {
-        let r = range::parse(">=0.5.1-alpha3, <0.6").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::GtEq,
-                major: 0,
-                minor: Some(5),
-                patch: Some(1),
-                pre: vec![Identifier::AlphaNumeric(String::from("alpha3"))],
-            },
-            r.predicates[0]
-        );
-
-        assert_eq!(
-            Predicate {
-                op: Op::Lt,
-                major: 0,
-                minor: Some(6),
-                patch: None,
-                pre: Vec::new(),
-            },
-            r.predicates[1]
-        );
-    }
-
-    #[test]
-    pub fn test_multiple_06() {
-        let r = range::parse("<= 0.2.0 >= 0.5.0").unwrap();
-
-        assert_eq!(
-            Predicate {
-                op: Op::LtEq,
-                major: 0,
-                minor: Some(2),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[0]
-        );
-
-        assert_eq!(
-            Predicate {
-                op: Op::GtEq,
-                major: 0,
-                minor: Some(5),
-                patch: Some(0),
-                pre: Vec::new(),
-            },
-            r.predicates[1]
-        );
-    }
-
-    #[test]
-    fn test_parse_build_metadata_with_predicate() {
-        assert_eq!(
-            range::parse("^1.2.3+meta").unwrap().predicates[0].op,
-            Op::Compatible
-        );
-        assert_eq!(
-            range::parse("~1.2.3+meta").unwrap().predicates[0].op,
-            Op::Tilde
-        );
-        assert_eq!(
-            range::parse("=1.2.3+meta").unwrap().predicates[0].op,
-            Op::Ex
-        );
-        assert_eq!(
-            range::parse("<=1.2.3+meta").unwrap().predicates[0].op,
-            Op::LtEq
-        );
-        assert_eq!(
-            range::parse(">=1.2.3+meta").unwrap().predicates[0].op,
-            Op::GtEq
-        );
-        assert_eq!(
-            range::parse("<1.2.3+meta").unwrap().predicates[0].op,
+    macro_rules! op {
+        ( "=" ) => {
+            Op::Eq
+        };
+        ( "<" ) => {
             Op::Lt
-        );
-        assert_eq!(
-            range::parse(">1.2.3+meta").unwrap().predicates[0].op,
+        };
+        ( "<=" ) => {
+            Op::Lte
+        };
+        ( ">" ) => {
             Op::Gt
-        );
+        };
+        ( ">=" ) => {
+            Op::Gte
+        };
     }
 
-    #[test]
-    pub fn test_parse_errors() {
-        assert!(range::parse("\0").is_err());
-        assert!(range::parse(">= >= 0.0.2").is_err());
-        assert!(range::parse(">== 0.0.2").is_err());
-        assert!(range::parse("a.0.0").is_err());
-        assert!(range::parse("1.0.0-").is_err());
-        assert!(range::parse(">=").is_err());
-        assert!(range::parse("> 0.1.0,").is_err());
-        assert!(range::parse("> 0.3.0, ,").is_err());
-        assert!(range::parse("> 0. 1").is_err());
+    // tests
+
+    range_tests! {
+        major: ("1", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        major_minor: ("1.2", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
+        major_minor_patch: ("1.2.3", comp_sets!( [op!(">="), 1, 2, 3], [op!("<"), 2, 0, 0] )),
+
+        eq_major: ("=1", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        eq_major_minor: ("=1.2", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
+        eq_major_minor_patch: ("=1.2.3", comp_sets!( [op!("="), 1, 2, 3] )),
+        eq_all: ("=*", comp_sets!( [op!(">="), 0, 0, 0] )),
+        eq_major_star: ("=1.*", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        eq_major_minor_star: ("=1.2.*", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
+
+        lt_major: ("<1", comp_sets!( [op!("<"), 1, 0, 0] )),
+        lt_major_minor: ("<1.2", comp_sets!( [op!("<"), 1, 2, 0] )),
+        lt_major_minor_patch: ("<1.2.3", comp_sets!( [op!("<"), 1, 2, 3] )),
+        lt_all: ("<*", comp_sets!( [op!("<"), 0, 0, 0] )),
+        lt_major_star: ("<1.*", comp_sets!( [op!("<"), 1, 0, 0] )),
+        lt_major_minor_star: ("<1.2.*", comp_sets!( [op!("<"), 1, 2, 0] )),
+
+        lte_major: ("<=1", comp_sets!( [op!("<="), 1, 0, 0] )),
+        lte_major_minor: ("<=1.2", comp_sets!( [op!("<="), 1, 2, 0] )),
+        lte_major_minor_patch: ("<=1.2.3", comp_sets!( [op!("<="), 1, 2, 3] )),
+        lte_all: ("<=*", comp_sets!( [op!(">="), 0, 0, 0] )),
+        lte_major_star: ("<=1.*", comp_sets!( [op!("<="), 1, 0, 0] )),
+        lte_major_minor_star: ("<=1.2.*", comp_sets!( [op!("<="), 1, 2, 0] )),
+
+        gt_major: (">1", comp_sets!( [op!(">"), 1, 0, 0] )),
+        gt_major_minor: (">1.2", comp_sets!( [op!(">"), 1, 2, 0] )),
+        gt_major_minor_patch: (">1.2.3", comp_sets!( [op!(">"), 1, 2, 3] )),
+        gt_all: (">*", comp_sets!( [op!("<"), 0, 0, 0] )),
+        gt_major_star: (">1.*", comp_sets!( [op!(">"), 1, 0, 0] )),
+        gt_major_minor_star: (">1.2.*", comp_sets!( [op!(">"), 1, 2, 0] )),
+
+        gte_major: (">=1", comp_sets!( [op!(">="), 1, 0, 0] )),
+        gte_major_minor: (">=1.2", comp_sets!( [op!(">="), 1, 2, 0] )),
+        gte_major_minor_patch: (">=1.2.3", comp_sets!( [op!(">="), 1, 2, 3] )),
+        gte_all: (">=*", comp_sets!( [op!(">="), 0, 0, 0] )),
+        gte_major_star: (">=1.*", comp_sets!( [op!(">="), 1, 0, 0] )),
+        gte_major_minor_star: (">=1.2.*", comp_sets!( [op!(">="), 1, 2, 0] )),
+
+        tilde_major: ("~1", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        tilde_major_0: ("~0", comp_sets!( [op!(">="), 0, 0, 0], [op!("<"), 1, 0, 0] )),
+        tilde_major_xrange: ("~1.x", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        tilde_major_2: ("~>1", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        tilde_major_minor: ("~1.2", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
+        tilde_major_minor_xrange: ("~1.2.x", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
+        tilde_major_minor_2: ("~>1.2", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
+        tilde_major_minor_patch: ("~1.2.3", comp_sets!( [op!(">="), 1, 2, 3], [op!("<"), 1, 3, 0] )),
+        tilde_major_minor_patch_pre: ("~1.2.3-beta", comp_sets!( [op!(">="), 1, 2, 3, pre!(id_alpha!("beta"))], [op!("<"), 1, 3, 0, pre!()] )),
+        tilde_major_minor_patch_2: ("~>1.2.3", comp_sets!( [op!(">="), 1, 2, 3], [op!("<"), 1, 3, 0] )),
+        tilde_major_0_minor_patch: ("~0.2.3", comp_sets!( [op!(">="), 0, 2, 3], [op!("<"), 0, 3, 0] )),
+        tilde_all: ("~*", comp_sets!( [op!(">="), 0, 0, 0] )),
+
+        caret_major: ("^1", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        caret_major_xrange: ("^1.x", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        caret_major_minor: ("^1.2", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 2, 0, 0] )),
+        caret_major_minor_xrange: ("^1.2.x", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 2, 0, 0] )),
+        caret_major_minor_patch: ("^1.2.3", comp_sets!( [op!(">="), 1, 2, 3], [op!("<"), 2, 0, 0] )),
+        caret_major_minor_patch_pre: ("^1.2.3-beta.4", comp_sets!( [op!(">="), 1, 2, 3, pre!(id_alpha!("beta"), id_num!(4))], [op!("<"), 2, 0, 0, pre!()] )),
+
+        caret_major_0: ("^0", comp_sets!( [op!(">="), 0, 0, 0], [op!("<"), 1, 0, 0] )),
+        caret_major_0_xrange: ("^0.x", comp_sets!( [op!(">="), 0, 0, 0], [op!("<"), 1, 0, 0] )),
+        caret_major_0_minor_0: ("^0.0", comp_sets!( [op!(">="), 0, 0, 0], [op!("<"), 0, 1, 0] )),
+        caret_major_0_minor_0_xrange: ("^0.0.x", comp_sets!( [op!(">="), 0, 0, 0], [op!("<"), 0, 1, 0] )),
+        caret_major_0_minor: ("^0.1", comp_sets!( [op!(">="), 0, 1, 0], [op!("<"), 0, 2, 0] )),
+        caret_major_0_minor_xrange: ("^0.1.x", comp_sets!( [op!(">="), 0, 1, 0], [op!("<"), 0, 2, 0] )),
+        caret_major_0_minor_patch: ("^0.1.2", comp_sets!( [op!(">="), 0, 1, 2], [op!("<"), 0, 2, 0] )),
+        caret_major_0_minor_0_patch: ("^0.0.1", comp_sets!( [op!(">="), 0, 0, 1], [op!("<"), 0, 0, 2] )),
+        caret_major_0_minor_0_pre: ("^0.0.1-beta", comp_sets!( [op!(">="), 0, 0, 1, pre!(id_alpha!("beta"))], [op!("<"), 0, 0, 2, pre!()] )),
+        caret_all: ("^*", comp_sets!( [op!(">="), 0, 0, 0] )),
+
+        two_comparators_1: (">1.2.3 <4.5.6", comp_sets!( [op!(">"), 1, 2, 3], [op!("<"), 4, 5, 6] )),
+        two_comparators_2: ("^1.2 ^1", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 2, 0, 0], [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+
+        comparator_with_pre: ("=1.2.3-rc.1", comp_sets!( [op!("="), 1, 2, 3, pre!(id_alpha!("rc"), id_num!(1))] )),
+
+        hyphen_major: ("1 - 4", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 5, 0, 0] )),
+        hyphen_major_x: ("1.* - 4.*", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 5, 0, 0] )),
+        hyphen_major_minor_x: ("1.2.x - 4.5.x", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 4, 6, 0] )),
+        hyphen_major_minor_patch: ("1.2.3 - 4.5.6", comp_sets!( [op!(">="), 1, 2, 3], [op!("<="), 4, 5, 6] )),
+        hyphen_with_pre: ("1.2.3-rc1 - 4.5.6", comp_sets!( [op!(">="), 1, 2, 3, pre!(id_alpha!("rc1"))], [op!("<="), 4, 5, 6, pre!()] )),
+        hyphen_xrange_minor_only1: ("1.*.3 - 3.4.5", comp_sets!( [op!(">="), 1, 0, 0], [op!("<="), 3, 4, 5] )),
+        hyphen_xrange_minor_only2: ("1.2.3 - 3.*.5", comp_sets!( [op!(">="), 1, 2, 3], [op!("<"), 4, 0, 0] )),
+
+        hyphen_all_to_something: ("* - 3.4.5", comp_sets!( [op!("<="), 3, 4, 5] )),
+        hyphen_to_all: ("1.2.3 - *", comp_sets!( [op!(">="), 1, 2, 3] )),
+        hyphen_all_to_all: ("* - *", comp_sets!( [op!(">="), 0, 0, 0] )),
+
+        gte_space: (">= 1.2.3", comp_sets!( [op!(">="), 1, 2, 3] )),
+        gte_tab: (">=\t1.2.3", comp_sets!( [op!(">="), 1, 2, 3] )),
+        gte_two_spaces: (">=  1.2.3", comp_sets!( [op!(">="), 1, 2, 3] )),
+        gt_space: ("> 1.2.3", comp_sets!( [op!(">"), 1, 2, 3] )),
+        gt_two_spaces: (">  1.2.3", comp_sets!( [op!(">"), 1, 2, 3] )),
+        lte_space: ("<= 1.2.3", comp_sets!( [op!("<="), 1, 2, 3] )),
+        lte_two_spaces: ("<=  1.2.3", comp_sets!( [op!("<="), 1, 2, 3] )),
+        lt_space: ("< 1.2.3", comp_sets!( [op!("<"), 1, 2, 3] )),
+        lt_two_spaces: ("<  1.2.3", comp_sets!( [op!("<"), 1, 2, 3] )),
+        eq_space: ("= 1.2.3", comp_sets!( [op!("="), 1, 2, 3] )),
+        eq_two_spaces: ("=  1.2.3", comp_sets!( [op!("="), 1, 2, 3] )),
+        caret_space: ("^ 1.2.3", comp_sets!( [op!(">="), 1, 2, 3], [op!("<"), 2, 0, 0] )),
+        tilde_space: ("~ 1.2.3", comp_sets!( [op!(">="), 1, 2, 3], [op!("<"), 1, 3, 0] )),
+        hyphen_spacing: ("1.2.3 -  4.5.6", comp_sets!( [op!(">="), 1, 2, 3], [op!("<="), 4, 5, 6] )),
+
+        // digit options
+        digits: ("=0.2.3", comp_sets!( [op!("="), 0, 2, 3] )),
+        digits_2: ("=11.2.3", comp_sets!( [op!("="), 11, 2, 3] )),
+        digits_3: ("=1.12.3", comp_sets!( [op!("="), 1, 12, 3] )),
+        digits_4: ("=1.2.13", comp_sets!( [op!("="), 1, 2, 13] )),
+        digits_5: ("=1.2.5678", comp_sets!( [op!("="), 1, 2, 5678] )),
+
+        xrange_major_x: ("1.x", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        xrange_major_x_x: ("1.x.x", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        xrange_major_minor_x: ("1.2.x", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
+        xrange_major_xx: ("1.X", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        xrange_major_xx_xx: ("1.X.X", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        xrange_major_minor_xx: ("1.2.X", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
+        xrange_star: ("*", comp_sets!( [op!(">="), 0, 0, 0] )),
+        xrange_x: ("x", comp_sets!( [op!(">="), 0, 0, 0] )),
+        xrange_xx: ("X", comp_sets!( [op!(">="), 0, 0, 0] )),
+        xrange_major_star: ("1.*", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        xrange_major_star_star: ("1.*.*", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        xrange_major_minor_star: ("1.2.*", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
+        xrange_with_pre: ("1.*.*-beta", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+        // this is handled as "1.*":
+        xrange_minor_only: ("1.*.3", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
+
+        // special cases
+        gte_star: (">=*", comp_sets!( [op!(">="), 0, 0, 0] )),
+        empty: ("", comp_sets!( [op!(">="), 0, 0, 0] )),
     }
 
-    #[test]
-    pub fn test_large_major_version() {
-        assert!(range::parse("18446744073709551617.0.0").is_err());
-    }
-
-    #[test]
-    pub fn test_large_minor_version() {
-        assert!(range::parse("0.18446744073709551617.0").is_err());
-    }
-
-    #[test]
-    pub fn test_large_patch_version() {
-        assert!(range::parse("0.0.18446744073709551617").is_err());
-    }
-
-    #[test]
-    pub fn test_op_partialord_lt() {
-        let expect_less = Op::Ex;
-        let other = Op::Gt;
-        assert!(expect_less.lt(&other));
-    }
-
-    #[test]
-    pub fn test_op_partialord_le() {
-        let strictly_lt = Op::Ex;
-        let other = Op::Lt;
-        assert!(strictly_lt.le(&other));
-        assert!(other.le(&other));
-    }
-
-    #[test]
-    pub fn test_op_partialord_gt() {
-        let expect_gt = Op::Compatible;
-        let other = Op::GtEq;
-        assert!(expect_gt.gt(&other));
-    }
-
-    #[test]
-    pub fn test_op_partialord_ge() {
-        let strictly_gt = Op::Compatible;
-        let other = Op::Tilde;
-        assert!(strictly_gt.ge(&other));
-        assert!(other.ge(&other));
-    }
-
-    #[test]
-    pub fn test_wildcard_partialord_lt() {
-        let expect_less = WildcardVersion::Minor;
-        let other = WildcardVersion::Patch;
-        assert!(expect_less.lt(&other));
-    }
-
-    #[test]
-    pub fn test_wildcard_partialord_le() {
-        let strictly_lt = WildcardVersion::Minor;
-        let other = WildcardVersion::Patch;
-        assert!(strictly_lt.le(&other));
-        assert!(other.le(&other));
-    }
-
-    #[test]
-    pub fn test_wildcard_partialord_gt() {
-        let expect_greater = WildcardVersion::Patch;
-        let other = WildcardVersion::Minor;
-        assert!(expect_greater.gt(&other));
-    }
-
-    #[test]
-    pub fn test_wildcard_partialord_ge() {
-        let strictly_gt = WildcardVersion::Patch;
-        let other = WildcardVersion::Minor;
-        assert!(strictly_gt.ge(&other));
-        assert!(other.ge(&other));
+    range_tests_nodecompat! {
+        node_major_minor_patch: ("1.2.3", comp_sets!( [op!("="), 1, 2, 3] )),
     }
 }
