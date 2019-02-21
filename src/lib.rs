@@ -10,6 +10,9 @@ pub use crate::range_set::RangeSet;
 
 mod range;
 pub use crate::range::Range;
+pub use crate::range::Comparator;
+pub use crate::range::Op;
+pub use crate::range::Identifier;
 
 // from old lib:
 pub mod lexer;
