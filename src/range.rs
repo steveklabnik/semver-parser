@@ -184,15 +184,8 @@ pub mod simple {
                                     comparators.push(partial.as_comparator(Op::Eq));
                                 }
                                 range_set::Compat::Cargo => {
-                                    // for cargo, "1.2.3" --> ">=1.2.3 <2.0.0"
-                                    comparators.push(partial.clone().as_comparator(Op::Gte));
-                                    comparators.push(
-                                        partial
-                                            .inc_major()
-                                            .zero_minor()
-                                            .zero_patch()
-                                            .as_comparator(Op::Lt),
-                                    );
+                                    // for cargo, "1.2.3" is parsed as "^1.2.3"
+                                    handle_caret_range(partial, &mut comparators);
                                 }
                             }
                         }
@@ -276,78 +269,9 @@ pub mod simple {
 
                     let partial_component = components.remove(0);
                     let components: Vec<_> = partial_component.into_inner().collect();
-                    let mut partial = parse_partial(components);
+                    let partial = parse_partial(components);
 
-                    // major version 0 is a special case for caret
-                    if partial.major == Some(0) {
-                        match partial.kind {
-                            PartialKind::XRangeOnly => unreachable!(),
-                            PartialKind::MajorOnly => {
-                                // "^0", "^0.*" --> ">=0.0.0 <1.0.0"
-                                comparators
-                                    .push(partial.clone().zero_missing().as_comparator(Op::Gte));
-                                comparators.push(
-                                    partial
-                                        .inc_major()
-                                        .zero_missing()
-                                        .no_pre()
-                                        .as_comparator(Op::Lt),
-                                );
-                            }
-                            PartialKind::MajorMinor => {
-                                // "^0.2", "^0.2.*" --> ">=0.2.0 <0.3.0"
-                                comparators
-                                    .push(partial.clone().zero_missing().as_comparator(Op::Gte));
-                                comparators.push(
-                                    partial
-                                        .inc_minor()
-                                        .zero_patch()
-                                        .no_pre()
-                                        .as_comparator(Op::Lt),
-                                );
-                            }
-                            PartialKind::MajorMinorPatch => {
-                                if partial.minor == Some(0) {
-                                    // "^0.0.1" --> ">=0.0.1 <0.0.2"
-                                    comparators.push(partial.clone().as_comparator(Op::Gte));
-                                    comparators
-                                        .push(partial.inc_patch().no_pre().as_comparator(Op::Lt));
-                                } else {
-                                    // "^0.2.3" --> ">=0.2.3 <0.3.0"
-                                    comparators.push(partial.clone().as_comparator(Op::Gte));
-                                    comparators.push(
-                                        partial
-                                            .inc_minor()
-                                            .zero_patch()
-                                            .no_pre()
-                                            .as_comparator(Op::Lt),
-                                    );
-                                }
-                            }
-                        }
-                    } else {
-                        match partial.kind {
-                            PartialKind::XRangeOnly => {
-                                // "^*" --> ">=0.0.0"
-                                comparators.push(partial.zero_missing().as_comparator(Op::Gte));
-                            }
-                            _ => {
-                                // "^1", "^1.*" --> ">=1.0.0 <2.0.0"
-                                // "^1.2", "^1.2.*" --> ">=1.2.0 <2.0.0"
-                                // "^1.2.3" --> ">=1.2.3 <2.0.0"
-                                comparators
-                                    .push(partial.clone().zero_missing().as_comparator(Op::Gte));
-                                comparators.push(
-                                    partial
-                                        .inc_major()
-                                        .zero_minor()
-                                        .zero_patch()
-                                        .no_pre()
-                                        .as_comparator(Op::Lt),
-                                );
-                            }
-                        }
-                    }
+                    handle_caret_range(partial, &mut comparators);
                 }
                 Rule::tilde => {
                     let mut components: Vec<_> = record.into_inner().collect();
@@ -392,6 +316,76 @@ pub mod simple {
 
         Ok(comparators)
     }
+
+    fn handle_caret_range(mut partial: Partial, comparators: &mut Vec<Comparator>) -> () {
+        // major version 0 is a special case for caret
+        if partial.major == Some(0) {
+            match partial.kind {
+                PartialKind::XRangeOnly => unreachable!(),
+                PartialKind::MajorOnly => {
+                    // "^0", "^0.*" --> ">=0.0.0 <1.0.0"
+                    comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
+                    comparators.push(
+                        partial
+                            .inc_major()
+                            .zero_missing()
+                            .no_pre()
+                            .as_comparator(Op::Lt),
+                    );
+                }
+                PartialKind::MajorMinor => {
+                    // "^0.2", "^0.2.*" --> ">=0.2.0 <0.3.0"
+                    comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
+                    comparators.push(
+                        partial
+                            .inc_minor()
+                            .zero_patch()
+                            .no_pre()
+                            .as_comparator(Op::Lt),
+                    );
+                }
+                PartialKind::MajorMinorPatch => {
+                    if partial.minor == Some(0) {
+                        // "^0.0.1" --> ">=0.0.1 <0.0.2"
+                        comparators.push(partial.clone().as_comparator(Op::Gte));
+                        comparators.push(partial.inc_patch().no_pre().as_comparator(Op::Lt));
+                    } else {
+                        // "^0.2.3" --> ">=0.2.3 <0.3.0"
+                        comparators.push(partial.clone().as_comparator(Op::Gte));
+                        comparators.push(
+                            partial
+                                .inc_minor()
+                                .zero_patch()
+                                .no_pre()
+                                .as_comparator(Op::Lt),
+                        );
+                    }
+                }
+            }
+        } else {
+            match partial.kind {
+                PartialKind::XRangeOnly => {
+                    // "^*" --> ">=0.0.0"
+                    comparators.push(partial.zero_missing().as_comparator(Op::Gte));
+                }
+                _ => {
+                    // "^1", "^1.*" --> ">=1.0.0 <2.0.0"
+                    // "^1.2", "^1.2.*" --> ">=1.2.0 <2.0.0"
+                    // "^1.2.3" --> ">=1.2.3 <2.0.0"
+                    comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
+                    comparators.push(
+                        partial
+                            .inc_major()
+                            .zero_minor()
+                            .zero_patch()
+                            .no_pre()
+                            .as_comparator(Op::Lt),
+                    );
+                }
+            }
+        }
+    }
+
 
     pub fn from_hyphen_range(
         parsed_simple: pest::iterators::Pair<'_, Rule>,
@@ -695,6 +689,8 @@ mod tests {
         major: ("1", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
         major_minor: ("1.2", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
         major_minor_patch: ("1.2.3", comp_sets!( [op!(">="), 1, 2, 3], [op!("<"), 2, 0, 0] )),
+        major_0_minor_patch: ("0.2.3", comp_sets!( [op!(">="), 0, 2, 3], [op!("<"), 0, 3, 0] )),
+        major_0_minor_0_patch: ("0.0.1", comp_sets!( [op!(">="), 0, 0, 1], [op!("<"), 0, 0, 2] )),
 
         eq_major: ("=1", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
         eq_major_minor: ("=1.2", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
