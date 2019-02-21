@@ -1,6 +1,6 @@
 range_set  = { SOI ~ space* ~ range ~ (logical_or ~ range)* ~ space* ~ EOI }
 logical_or = { space* ~ "||" ~ space* }
-range      = { hyphen | simple ~ ( space+ ~ simple )* | empty }
+range      = { hyphen | simple ~ ( ","? ~ space+ ~ simple )* | empty }
 empty      = { "" }
 hyphen     = { partial ~ space+ ~ "-" ~ space+ ~ partial }
 simple     = { primitive | partial | tilde | caret }
