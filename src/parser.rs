@@ -152,7 +152,7 @@ impl<'input> Parser<'input> {
 
     /// Parse an string identifier.
     ///
-    /// Like, `foo`, or `bar`.
+    /// Like, `foo`, or `bar`, or `beta-1`.
     pub fn identifier(&mut self) -> Result<Identifier, Error<'input>> {
         let identifier = match self.pop()? {
             Token::AlphaNumeric(identifier) => {
@@ -163,7 +163,16 @@ impl<'input> Parser<'input> {
             tok => return Err(UnexpectedToken(tok)),
         };
 
-        Ok(identifier)
+        if let Some(&Token::Hyphen) = self.peek() {
+            // pop the peeked hyphen
+            self.pop()?;
+            // concat with any following identifiers
+            Ok(identifier
+                .concat("-")
+                .concat(&self.identifier()?.to_string()))
+        } else {
+            Ok(identifier)
+        }
     }
 
     /// Parse all pre-release identifiers, separated by dots.

@@ -114,6 +114,15 @@ pub enum Identifier {
     AlphaNumeric(String),
 }
 
+impl Identifier {
+    pub fn concat(self, add_str: &str) -> Identifier {
+        match self {
+            Identifier::Numeric(n) => Identifier::AlphaNumeric(format!("{}{}", n, add_str)),
+            Identifier::AlphaNumeric(s) => Identifier::AlphaNumeric(format!("{}{}", s, add_str)),
+        }
+    }
+}
+
 /// Function for parsing version string to [`Version`].
 ///
 /// Returns `Result<`[`Version`]`, String>`, where `String` represents an error while parsing.
@@ -490,6 +499,21 @@ mod tests {
         assert_eq!(0, parsed.patch);
 
         let expected_pre = vec![Identifier::AlphaNumeric(String::from("WIP"))];
+        assert_eq!(expected_pre, parsed.pre);
+    }
+
+    #[test]
+    fn parse_regression_02() {
+        // this is used by really old versions of npm, and is valid according to semver.org
+        let version = "1.2.3-beta-1";
+
+        let parsed = version::parse(version).unwrap();
+
+        assert_eq!(1, parsed.major);
+        assert_eq!(2, parsed.minor);
+        assert_eq!(3, parsed.patch);
+
+        let expected_pre = vec![Identifier::AlphaNumeric(String::from("beta-1"))];
         assert_eq!(expected_pre, parsed.pre);
     }
 }
