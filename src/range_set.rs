@@ -3,12 +3,12 @@ use pest::Parser;
 
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct RangeSet {
     pub ranges: Vec<Range>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Compat {
     Cargo, // default
     Node,

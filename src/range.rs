@@ -1,11 +1,11 @@
 use crate::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Range {
     pub comparator_set: Vec<Comparator>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Comparator {
     pub op: Op,
     pub major: u64,
@@ -14,7 +14,7 @@ pub struct Comparator {
     pub pre: Vec<Identifier>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Op {
     Lt,
     Lte,
@@ -23,13 +23,13 @@ pub enum Op {
     Eq,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Identifier {
     Numeric(u64),
     AlphaNumeric(String),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Partial {
     major: Option<u64>,
     minor: Option<u64>,
@@ -38,7 +38,7 @@ pub struct Partial {
     kind: PartialKind,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum PartialKind {
     XRangeOnly,
     MajorOnly,
@@ -385,7 +385,6 @@ pub mod simple {
             }
         }
     }
-
 
     pub fn from_hyphen_range(
         parsed_simple: pest::iterators::Pair<'_, Rule>,
