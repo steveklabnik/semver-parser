@@ -3,6 +3,7 @@ use crate::*;
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Range {
     pub comparator_set: Vec<Comparator>,
+    pub compat: range_set::Compat,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -107,7 +108,7 @@ impl Partial {
 
 pub fn from_pair_iterator(
     parsed_range: pest::iterators::Pair<'_, Rule>,
-    compat: &range_set::Compat,
+    compat: range_set::Compat,
 ) -> Result<Range, String> {
     // First of all, do we have the correct iterator?
     if parsed_range.as_rule() != Rule::range {
@@ -124,7 +125,7 @@ pub fn from_pair_iterator(
                 comparator_set.append(&mut hyphen_set);
             }
             Rule::simple => {
-                let mut comparators = simple::from_pair_iterator(record, &compat)?;
+                let mut comparators = simple::from_pair_iterator(record, compat)?;
                 comparator_set.append(&mut comparators);
             }
             Rule::empty => {
@@ -134,7 +135,10 @@ pub fn from_pair_iterator(
         }
     }
 
-    Ok(Range { comparator_set })
+    Ok(Range {
+        comparator_set,
+        compat,
+    })
 }
 
 pub mod simple {
@@ -142,7 +146,7 @@ pub mod simple {
 
     pub fn from_pair_iterator(
         parsed_simple: pest::iterators::Pair<'_, Rule>,
-        compat: &range_set::Compat,
+        compat: range_set::Compat,
     ) -> Result<Vec<Comparator>, String> {
         // First of all, do we have the correct iterator?
         if parsed_simple.as_rule() != Rule::simple {
@@ -573,7 +577,7 @@ mod tests {
                     let (input, expected_range) = $value;
 
                     let parsed_range = parse_range(input);
-                    let range = from_pair_iterator(parsed_range, &range_set::Compat::Cargo).expect("parsing failed");
+                    let range = from_pair_iterator(parsed_range, range_set::Compat::Cargo).expect("parsing failed");
 
                     // get the expected length from the input range
                     let num_comparators = range.comparator_set.len();
@@ -594,7 +598,7 @@ mod tests {
                     let (input, expected_range) = $value;
 
                     let parsed_range = parse_range(input);
-                    let range = from_pair_iterator(parsed_range, &range_set::Compat::Node).expect("parsing failed");
+                    let range = from_pair_iterator(parsed_range, range_set::Compat::Node).expect("parsing failed");
 
                     // get the expected length from the input range
                     let num_comparators = range.comparator_set.len();
@@ -620,7 +624,9 @@ mod tests {
                             pre: pre!(None),
                         },
                     )*
-                ]}
+                ],
+                compat: range_set::Compat::Cargo
+            }
         };
         // if you specify pre for one item, you have to do it for all of them
         ( $( [$op:expr, $major:expr, $minor:expr, $patch:expr, $pre:expr] ),* ) => {
@@ -635,7 +641,29 @@ mod tests {
                             pre: $pre,
                         },
                     )*
-                ]}
+                ],
+                compat: range_set::Compat::Cargo
+            }
+        };
+    }
+
+    // for node compatibility
+    macro_rules! comp_sets_node {
+        ( $( [$op:expr, $major:expr, $minor:expr, $patch:expr] ),* ) => {
+            Range {
+                comparator_set: vec![
+                    $(
+                        Comparator {
+                            op: $op,
+                            major: $major,
+                            minor: $minor,
+                            patch: $patch,
+                            pre: pre!(None),
+                        },
+                    )*
+                ],
+                compat: range_set::Compat::Node
+            }
         };
     }
 
@@ -818,6 +846,6 @@ mod tests {
     }
 
     range_tests_nodecompat! {
-        node_major_minor_patch: ("1.2.3", comp_sets!( [op!("="), 1, 2, 3] )),
+        node_major_minor_patch: ("1.2.3", comp_sets_node!( [op!("="), 1, 2, 3] )),
     }
 }

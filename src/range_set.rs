@@ -6,10 +6,10 @@ use std::str::FromStr;
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct RangeSet {
     pub ranges: Vec<Range>,
-    pub compat: Option<Compat>, // default to Cargo if None
+    pub compat: Compat,
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Compat {
     Cargo, // default
     Node,
@@ -19,7 +19,7 @@ impl RangeSet {
     fn new() -> RangeSet {
         RangeSet {
             ranges: Vec::new(),
-            compat: None,
+            compat: Compat::Cargo, // default
         }
     }
 
@@ -57,7 +57,7 @@ fn from_pair_iterator(
 
     // Next, we make a new, empty range
     let mut range_set = RangeSet::new();
-    range_set.compat = Some(compat.clone());
+    range_set.compat = compat;
 
     // Now we need to parse each range out of the set
     for record in parsed_range_set.into_inner() {
@@ -67,7 +67,7 @@ fn from_pair_iterator(
                 // ... let's parse it and push it onto our list of ranges
                 range_set
                     .ranges
-                    .push(range::from_pair_iterator(record, &compat)?);
+                    .push(range::from_pair_iterator(record, compat)?);
             }
 
             // we don't need to do anything with the logical ors between ranges
