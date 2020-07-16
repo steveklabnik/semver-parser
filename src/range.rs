@@ -256,11 +256,25 @@ pub mod simple {
                             PartialKind::MajorOnly => {
                                 // ">1", "=1", etc.
                                 // ">1.*.3" == ">1.*"
-                                comparators.push(partial.zero_missing().as_comparator(op));
+                                match op {
+                                    Op::Lte => comparators.push(
+                                        partial
+                                            .inc_major()
+                                            .zero_minor()
+                                            .zero_patch()
+                                            .as_comparator(Op::Lt),
+                                    ),
+                                    _ => comparators.push(partial.zero_missing().as_comparator(op)),
+                                }
                             }
                             PartialKind::MajorMinor => {
                                 // ">1.2", "<1.2.*", etc.
-                                comparators.push(partial.zero_patch().as_comparator(op));
+                                match op {
+                                    Op::Lte => comparators.push(
+                                        partial.inc_minor().zero_patch().as_comparator(Op::Lt),
+                                    ),
+                                    _ => comparators.push(partial.zero_patch().as_comparator(op)),
+                                }
                             }
                             PartialKind::MajorMinorPatch => {
                                 comparators.push(partial.as_comparator(op));
@@ -733,12 +747,12 @@ mod tests {
         lt_major_star: ("<1.*", comp_sets!( [op!("<"), 1, 0, 0] )),
         lt_major_minor_star: ("<1.2.*", comp_sets!( [op!("<"), 1, 2, 0] )),
 
-        lte_major: ("<=1", comp_sets!( [op!("<="), 1, 0, 0] )),
-        lte_major_minor: ("<=1.2", comp_sets!( [op!("<="), 1, 2, 0] )),
+        lte_major: ("<=1", comp_sets!( [op!("<"), 2, 0, 0] )),
+        lte_major_minor: ("<=1.2", comp_sets!( [op!("<"), 1, 3, 0] )),
         lte_major_minor_patch: ("<=1.2.3", comp_sets!( [op!("<="), 1, 2, 3] )),
         lte_all: ("<=*", comp_sets!( [op!(">="), 0, 0, 0] )),
-        lte_major_star: ("<=1.*", comp_sets!( [op!("<="), 1, 0, 0] )),
-        lte_major_minor_star: ("<=1.2.*", comp_sets!( [op!("<="), 1, 2, 0] )),
+        lte_major_star: ("<=1.*", comp_sets!( [op!("<"), 2, 0, 0] )),
+        lte_major_minor_star: ("<=1.2.*", comp_sets!( [op!("<"), 1, 3, 0] )),
 
         gt_major: (">1", comp_sets!( [op!(">"), 1, 0, 0] )),
         gt_major_minor: (">1.2", comp_sets!( [op!(">"), 1, 2, 0] )),
