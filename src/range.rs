@@ -60,7 +60,7 @@ impl Partial {
 
     pub fn as_comparator(&self, op: Op) -> Comparator {
         Comparator {
-            op: op,
+            op,
             major: self.major.unwrap_or(0),
             minor: self.minor.unwrap_or(0),
             patch: self.patch.unwrap_or(0),
@@ -321,7 +321,7 @@ pub mod simple {
         Ok(comparators)
     }
 
-    fn handle_caret_range(mut partial: Partial, comparators: &mut Vec<Comparator>) -> () {
+    fn handle_caret_range(mut partial: Partial, comparators: &mut Vec<Comparator>) {
         // major version 0 is a special case for caret
         if partial.major == Some(0) {
             match partial.kind {
@@ -351,11 +351,11 @@ pub mod simple {
                 PartialKind::MajorMinorPatch => {
                     if partial.minor == Some(0) {
                         // "^0.0.1" --> ">=0.0.1 <0.0.2"
-                        comparators.push(partial.clone().as_comparator(Op::Gte));
+                        comparators.push(partial.as_comparator(Op::Gte));
                         comparators.push(partial.inc_patch().no_pre().as_comparator(Op::Lt));
                     } else {
                         // "^0.2.3" --> ">=0.2.3 <0.3.0"
-                        comparators.push(partial.clone().as_comparator(Op::Gte));
+                        comparators.push(partial.as_comparator(Op::Gte));
                         comparators.push(
                             partial
                                 .inc_minor()

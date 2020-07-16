@@ -25,9 +25,7 @@
 //! # Ok(())
 //! # }
 //! #
-//! # fn main() {
-//! #   try_main().unwrap();
-//! # }
+//! # try_main().unwrap();
 //! ```
 //! [`Version`]: ./struct.Version.html
 //! [`parse`]: ./fn.parse.html
@@ -57,9 +55,7 @@ use std::fmt;
 /// # Ok(())
 /// # }
 /// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
+/// # try_main().unwrap();
 /// ```
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq)]
 pub struct Version {
@@ -101,9 +97,7 @@ pub struct Version {
 /// # Ok(())
 /// # }
 /// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
+/// # try_main().unwrap();
 /// ```
 /// [`Version`]: ./struct.Version.html
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq)]
@@ -144,12 +138,10 @@ impl Identifier {
 /// # Ok(())
 /// # }
 /// #
-/// # fn main() {
-/// #   try_main().unwrap();
-/// # }
+/// # try_main().unwrap();
 /// ```
 /// [`Version`]: ./struct.Version.html
-pub fn parse<'input>(input: &'input str) -> Result<Version, parser::Error<'input>> {
+pub fn parse(input: &str) -> Result<Version, parser::Error> {
     let mut parser = Parser::new(input)?;
     let version = parser.version()?;
 

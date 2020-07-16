@@ -143,10 +143,10 @@ impl<'input> Lexer<'input> {
         let c2 = chars.next();
 
         Lexer {
-            input: input,
-            chars: chars,
-            c1: c1,
-            c2: c2,
+            input,
+            chars,
+            c1,
+            c2,
         }
     }
 
@@ -178,7 +178,7 @@ impl<'input> Lexer<'input> {
     /// A component can either be an alphanumeric or numeric.
     /// Does not permit leading zeroes if numeric.
     fn component(&mut self, start: usize) -> Result<Token<'input>, Error> {
-        let end = scan_while!(self, start, '0'...'9' | 'A'...'Z' | 'a'...'z');
+        let end = scan_while!(self, start, '0'..='9' | 'A'..='Z' | 'a'..='z');
         let input = &self.input[start..end];
 
         let mut it = input.chars();
@@ -209,6 +209,7 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = Result<Token<'input>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        #[allow(clippy::never_loop)]
         loop {
             // two subsequent char tokens.
             if let Some((_, a, b)) = self.two() {
@@ -242,7 +243,7 @@ impl<'input> Iterator for Lexer<'input> {
                     ',' => Comma,
                     '-' => Hyphen,
                     '+' => Plus,
-                    '0'...'9' | 'a'...'z' | 'A'...'Z' => {
+                    '0'..='9' | 'a'..='z' | 'A'..='Z' => {
                         self.step();
                         return Some(self.component(start));
                     }

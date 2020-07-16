@@ -70,10 +70,7 @@ impl<'input> Parser<'input> {
             None
         };
 
-        Ok(Parser {
-            lexer: lexer,
-            c1: c1,
-        })
+        Ok(Parser { lexer, c1 })
     }
 
     /// Pop one token.
@@ -195,13 +192,7 @@ impl<'input> Parser<'input> {
 
         parts.push(self.identifier()?);
 
-        loop {
-            match self.peek() {
-                Some(&Token::Dot) => {}
-                _ => break,
-            }
-
-            // pop the peeked hyphen.
+        while let Some(&Token::Dot) = self.peek() {
             self.pop()?;
 
             parts.push(self.identifier()?);
@@ -239,11 +230,11 @@ impl<'input> Parser<'input> {
         self.skip_whitespace()?;
 
         Ok(Version {
-            major: major,
-            minor: minor,
-            patch: patch,
-            pre: pre,
-            build: build,
+            major,
+            minor,
+            patch,
+            pre,
+            build,
         })
     }
 
