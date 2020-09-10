@@ -175,7 +175,7 @@ impl<'input> Parser<'input> {
     /// Parse all pre-release identifiers, separated by dots.
     ///
     /// Like, `abcdef.1234`.
-    fn pre(&mut self) -> Result<Vec<Identifier>, Error<'input>> {
+    pub fn pre(&mut self) -> Result<Vec<Identifier>, Error<'input>> {
         match self.peek() {
             Some(&Token::Hyphen) => {}
             _ => return Ok(vec![]),
