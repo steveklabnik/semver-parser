@@ -204,7 +204,7 @@ impl<'input> Parser<'input> {
     /// Parse optional build metadata.
     ///
     /// Like, `` (empty), or `+abcdef`.
-    fn plus_build_metadata(&mut self) -> Result<Vec<Identifier>, Error<'input>> {
+    pub fn plus_build_metadata(&mut self) -> Result<Vec<Identifier>, Error<'input>> {
         match self.peek() {
             Some(&Token::Plus) => {}
             _ => return Ok(vec![]),
