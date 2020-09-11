@@ -143,6 +143,7 @@ mod tests {
     range_set_test!( caret_range: "^1.2.3", 2 );
     range_set_test!( two_empty_ranges: "||", 1, 1 );
     range_set_test!( two_xranges: "1.2.* || 2.*", 2, 2 );
+    range_set_test!( see_issue_88: "=1.2.3+meta", 1 );
 
     range_set_nodecompat!( node_one_range: "1.2.3", 1 ); // this parses as "=1.2.3"
 
