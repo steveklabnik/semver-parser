@@ -183,7 +183,7 @@ pub mod simple {
                         }
                         PartialKind::MajorMinorPatch => {
                             match compat {
-                                range_set::Compat::Node => {
+                                range_set::Compat::Npm => {
                                     // for node, "1.2.3" is "=1.2.3"
                                     comparators.push(partial.as_comparator(Op::Eq));
                                 }
@@ -612,7 +612,7 @@ mod tests {
                     let (input, expected_range) = $value;
 
                     let parsed_range = parse_range(input);
-                    let range = from_pair_iterator(parsed_range, range_set::Compat::Node).expect("parsing failed");
+                    let range = from_pair_iterator(parsed_range, range_set::Compat::Npm).expect("parsing failed");
 
                     // get the expected length from the input range
                     let num_comparators = range.comparator_set.len();
@@ -676,7 +676,7 @@ mod tests {
                         },
                     )*
                 ],
-                compat: range_set::Compat::Node
+                compat: range_set::Compat::Npm
             }
         };
     }

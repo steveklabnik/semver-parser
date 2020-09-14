@@ -12,7 +12,7 @@ pub struct RangeSet {
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Compat {
     Cargo, // default
-    Node,
+    Npm,
 }
 
 impl RangeSet {
@@ -112,7 +112,7 @@ mod tests {
                 fn $name() {
                     let expected_sets = vec![$($x)*];
 
-                    let range_set = RangeSet::parse($input, Compat::Node).expect("parse failed");
+                    let range_set = RangeSet::parse($input, Compat::Npm).expect("parse failed");
 
                     assert_eq!(range_set.ranges.len(), expected_sets.len());
                     for it in range_set.ranges.iter().zip(expected_sets.iter()) {
