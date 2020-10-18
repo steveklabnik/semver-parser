@@ -1,8 +1,6 @@
-use pest_derive::Parser;
-
-#[derive(Parser)]
-#[grammar = "semver.pest"]
 struct SemverParser;
+mod generated;
+use self::generated::*;
 
 mod range_set;
 pub use crate::range_set::Compat;
