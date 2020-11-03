@@ -1,4 +1,5 @@
 struct SemverParser;
+#[rustfmt::skip]
 mod generated;
 use self::generated::*;
 
