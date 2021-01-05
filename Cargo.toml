@@ -1,6 +1,6 @@
 [package]
 name = "semver-parser"
-version = "0.10.1"
+version = "0.10.2"
 authors = ["Steve Klabnik <steve@steveklabnik.com>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/steveklabnik/semver-parser"
