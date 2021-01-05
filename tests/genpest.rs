@@ -14,7 +14,6 @@ const PREAMBLE: &str = "\
 //! This is @generated code, do not edit by hand.
 //! See `semver.pest` and `genpest.rs`.
 #![allow(unused_attributes)]
-#![rustfmt::skip]
 use super::SemverParser;
 ";
 

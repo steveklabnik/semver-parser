@@ -1,7 +1,6 @@
 //! This is @generated code, do not edit by hand.
 //! See `semver.pest` and `genpest.rs`.
 #![allow(unused_attributes)]
-#![rustfmt::skip]
 use super::SemverParser;
 
 #[allow(dead_code, non_camel_case_types)]
