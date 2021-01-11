@@ -32,7 +32,7 @@
 //!
 //! assert_eq!(Some(Ok(Token::AlphaNumeric("foo"))), l.next());
 //! assert_eq!(Some(Ok(Token::Whitespace(3, 4))), l.next());
-//! assert_eq!(Some(Err(Error::UnexpectedChar('/'))), l.next());
+//! assert_eq!(Some(Err(Error::UnexpectedChar('/', 5))), l.next());
 //! ```
 
 use self::Error::*;
@@ -143,7 +143,7 @@ impl<'input> Lexer<'input> {
         let mut chars = input.char_indices();
         let c1 = chars.next();
         let c2 = chars.next();
-        let position = 0;
+        let position = 1;
 
         Lexer {
             input,
