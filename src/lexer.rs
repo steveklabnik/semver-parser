@@ -37,6 +37,7 @@
 
 use self::Error::*;
 use self::Token::*;
+use crate::ErrorPosition;
 use std::str;
 
 macro_rules! scan_while {
@@ -122,7 +123,7 @@ impl<'input> Token<'input> {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
     /// Unexpected character.
-    UnexpectedChar(char),
+    UnexpectedChar(char, ErrorPosition),
 }
 
 /// Lexer for semver tokens belonging to a range.
@@ -130,6 +131,7 @@ pub enum Error {
 pub struct Lexer<'input> {
     input: &'input str,
     chars: str::CharIndices<'input>,
+    position: ErrorPosition,
     // lookahead
     c1: Option<(usize, char)>,
     c2: Option<(usize, char)>,
@@ -141,10 +143,12 @@ impl<'input> Lexer<'input> {
         let mut chars = input.char_indices();
         let c1 = chars.next();
         let c2 = chars.next();
+        let position = 0;
 
         Lexer {
             input,
             chars,
+            position,
             c1,
             c2,
         }
@@ -154,6 +158,7 @@ impl<'input> Lexer<'input> {
     fn step(&mut self) {
         self.c1 = self.c2;
         self.c2 = self.chars.next();
+        self.position += 1;
     }
 
     fn step_n(&mut self, n: usize) {
@@ -247,7 +252,7 @@ impl<'input> Iterator for Lexer<'input> {
                         self.step();
                         return Some(self.component(start));
                     }
-                    c => return Some(Err(UnexpectedChar(c))),
+                    c => return Some(Err(UnexpectedChar(c, self.position))),
                 };
 
                 self.step();

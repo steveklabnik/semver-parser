@@ -6,21 +6,22 @@ use std::mem;
 use self::Error::*;
 use crate::lexer::{self, Lexer, Token};
 use crate::version::{Identifier, Version};
+use crate::ErrorPosition;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error<'input> {
     /// Needed more tokens for parsing, but none are available.
     UnexpectedEnd,
     /// Unexpected token.
-    UnexpectedToken(Token<'input>),
+    UnexpectedToken(Token<'input>, ErrorPosition),
     /// An error occurred in the lexer.
     Lexer(lexer::Error),
     /// More input available.
     MoreInput(Vec<Token<'input>>),
     /// Encountered empty predicate in a set of predicates.
-    EmptyPredicate,
+    EmptyPredicate(ErrorPosition),
     /// Encountered an empty range.
-    EmptyRange,
+    EmptyRange(ErrorPosition),
 }
 
 impl<'input> From<lexer::Error> for Error<'input> {
@@ -35,11 +36,19 @@ impl<'input> fmt::Display for Error<'input> {
 
         match *self {
             UnexpectedEnd => write!(fmt, "expected more input"),
-            UnexpectedToken(ref token) => write!(fmt, "encountered unexpected token: {:?}", token),
-            Lexer(ref error) => write!(fmt, "lexer error: {:?}", error),
+            UnexpectedToken(ref token, position) => write!(
+                fmt,
+                "encountered unexpected token: {:?}, at position {}",
+                token, position
+            ),
+            Lexer(ref error) => {
+                write!(fmt, "lexer error: {:?}", error)
+            }
             MoreInput(ref tokens) => write!(fmt, "expected end of input, but got: {:?}", tokens),
-            EmptyPredicate => write!(fmt, "encountered empty predicate"),
-            EmptyRange => write!(fmt, "encountered empty range"),
+            EmptyPredicate(position) => {
+                write!(fmt, "encountered empty predicate at position {}", position)
+            }
+            EmptyRange(position) => write!(fmt, "encountered empty range at position {}", position),
         }
     }
 }
@@ -57,6 +66,8 @@ pub struct Parser<'input> {
     lexer: Lexer<'input>,
     /// Lookaehead.
     c1: Option<Token<'input>>,
+    /// Position for error
+    position: ErrorPosition,
 }
 
 impl<'input> Parser<'input> {
@@ -64,19 +75,27 @@ impl<'input> Parser<'input> {
     pub fn new(input: &'input str) -> Result<Parser<'input>, Error<'input>> {
         let mut lexer = Lexer::new(input);
 
+        let mut position = 0;
+
         let c1 = if let Some(c1) = lexer.next() {
+            position += 1;
             Some(c1?)
         } else {
             None
         };
 
-        Ok(Parser { lexer, c1 })
+        Ok(Parser {
+            lexer,
+            c1,
+            position,
+        })
     }
 
     /// Pop one token.
     #[inline(always)]
     fn pop(&mut self) -> Result<Token<'input>, Error<'input>> {
         let c1 = if let Some(c1) = self.lexer.next() {
+            self.position += 1;
             Some(c1?)
         } else {
             None
@@ -106,7 +125,7 @@ impl<'input> Parser<'input> {
         match self.pop()? {
             Token::Numeric(number) => Ok(Some(number)),
             ref t if t.is_wildcard() => Ok(None),
-            tok => Err(UnexpectedToken(tok)),
+            tok => Err(UnexpectedToken(tok, self.position)),
         }
     }
 
@@ -114,7 +133,7 @@ impl<'input> Parser<'input> {
     pub fn numeric(&mut self) -> Result<u64, Error<'input>> {
         match self.pop()? {
             Token::Numeric(number) => Ok(number),
-            tok => Err(UnexpectedToken(tok)),
+            tok => Err(UnexpectedToken(tok, self.position)),
         }
     }
 
@@ -141,7 +160,7 @@ impl<'input> Parser<'input> {
     pub fn dot_numeric(&mut self) -> Result<u64, Error<'input>> {
         match self.pop()? {
             Token::Dot => {}
-            tok => return Err(UnexpectedToken(tok)),
+            tok => return Err(UnexpectedToken(tok, self.position)),
         }
 
         self.numeric()
@@ -157,7 +176,7 @@ impl<'input> Parser<'input> {
                 Identifier::AlphaNumeric(identifier.to_string())
             }
             Token::Numeric(n) => Identifier::Numeric(n),
-            tok => return Err(UnexpectedToken(tok)),
+            tok => return Err(UnexpectedToken(tok, self.position)),
         };
 
         if let Some(&Token::Hyphen) = self.peek() {

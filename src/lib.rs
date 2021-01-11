@@ -18,3 +18,6 @@ pub mod lexer;
 pub mod parser;
 // pub mod range;
 pub mod version;
+
+// Defines the type to describe where (character position) the error is
+type ErrorPosition = u32;
