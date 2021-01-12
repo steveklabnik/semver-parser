@@ -170,7 +170,9 @@ impl<'input> Lexer<'input> {
     fn step(&mut self) {
         self.c1 = self.c2;
         self.c2 = self.chars.next();
-        self.position += 1;
+        if self.c1.is_some() {
+            self.position += 1;
+        }
     }
 
     fn step_n(&mut self, n: usize) {
