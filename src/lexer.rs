@@ -109,6 +109,7 @@ impl<'input> Token<'input> {
             Eq | Gt | Lt | LtEq | GtEq | Caret | Tilde | Star | Dot | Comma | Hyphen | Plus => 1,
             Or => 2,
             Whitespace(b_index, e_index) => e_index - b_index,
+            // TODO: find a better way (lower cost) to compute the number of digits in a given number
             Numeric(num) => num.to_string().len(),
             AlphaNumeric(alpha) => alpha.len(),
         }
