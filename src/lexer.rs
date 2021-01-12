@@ -319,17 +319,6 @@ mod tests {
     }
 
     #[test]
-    pub fn unexpected_character_position() {
-        let mut lexer = Lexer::new("/");
-        assert_eq!(lexer.next(), Some(Err(Error::UnexpectedChar('/', 1))));
-        lexer = Lexer::new("123 */");
-        assert_eq!(lexer.next(), Some(Ok(Numeric(123))));
-        assert_eq!(lexer.next(), Some(Ok(Whitespace(3, 4))));
-        assert_eq!(lexer.next(), Some(Ok(Star)));
-        assert_eq!(lexer.next(), Some(Err(Error::UnexpectedChar('/', 6))));
-    }
-
-    #[test]
     pub fn is_wildcard() {
         assert_eq!(Star.is_wildcard(), true);
         assert_eq!(AlphaNumeric("x").is_wildcard(), true);
@@ -355,5 +344,16 @@ mod tests {
             .collect();
 
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    pub fn unexpected_character_position() {
+        let mut lexer = Lexer::new("/");
+        assert_eq!(lexer.next(), Some(Err(Error::UnexpectedChar('/', 1))));
+        lexer = Lexer::new("123 */");
+        lexer.next(); // Some(Ok(Numeric(123)))
+        lexer.next(); // Some(Ok(Whitespace(3, 4)))
+        lexer.next(); // Some(Ok(Star))
+        assert_eq!(lexer.next(), Some(Err(Error::UnexpectedChar('/', 6))));
     }
 }

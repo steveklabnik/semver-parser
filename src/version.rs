@@ -231,6 +231,42 @@ mod tests {
     }
 
     #[test]
+    fn parse_empty_pre() {
+        let version = "1.2.3-";
+
+        let parsed = version::parse(version);
+
+        assert!(
+            parsed.is_err(),
+            format!("'{}' incorrectly considered a valid parse", version)
+        );
+    }
+
+    #[test]
+    fn parse_letters() {
+        let version = "a.b.c";
+
+        let parsed = version::parse(version);
+
+        assert!(
+            parsed.is_err(),
+            format!("'{}' incorrectly considered a valid parse", version)
+        );
+    }
+
+    #[test]
+    fn parse_with_letters() {
+        let version = "1.2.3 a.b.c";
+
+        let parsed = version::parse(version);
+
+        assert!(
+            parsed.is_err(),
+            format!("'{}' incorrectly considered a valid parse", version)
+        );
+    }
+
+    #[test]
     fn parse_first_unexpected_token_error() {
         let version = "x";
 
@@ -275,42 +311,6 @@ mod tests {
         assert_eq!(
             parsed.unwrap_err(),
             parser::Error::UnexpectedToken(lexer::Token::AlphaNumeric("x"), 5)
-        );
-    }
-
-    #[test]
-    fn parse_empty_pre() {
-        let version = "1.2.3-";
-
-        let parsed = version::parse(version);
-
-        assert!(
-            parsed.is_err(),
-            format!("'{}' incorrectly considered a valid parse", version)
-        );
-    }
-
-    #[test]
-    fn parse_letters() {
-        let version = "a.b.c";
-
-        let parsed = version::parse(version);
-
-        assert!(
-            parsed.is_err(),
-            format!("'{}' incorrectly considered a valid parse", version)
-        );
-    }
-
-    #[test]
-    fn parse_with_letters() {
-        let version = "1.2.3 a.b.c";
-
-        let parsed = version::parse(version);
-
-        assert!(
-            parsed.is_err(),
-            format!("'{}' incorrectly considered a valid parse", version)
         );
     }
 
