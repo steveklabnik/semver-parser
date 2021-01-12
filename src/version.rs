@@ -179,6 +179,7 @@ impl fmt::Display for Identifier {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lexer;
     use crate::version;
 
     #[test]
@@ -226,6 +227,54 @@ mod tests {
         assert!(
             parsed.is_err(),
             format!("'{}' incorrectly considered a valid parse", version)
+        );
+    }
+
+    #[test]
+    fn parse_first_unexpected_token_error() {
+        let version = "x";
+
+        let parsed = version::parse(version);
+
+        assert_eq!(
+            parsed.unwrap_err(),
+            parser::Error::UnexpectedToken(lexer::Token::AlphaNumeric("x"), 1)
+        );
+    }
+
+    #[test]
+    fn parse_first_unexpected_token_error_with_spaces() {
+        let version = "  x ";
+
+        let parsed = version::parse(version);
+
+        assert_eq!(
+            parsed.unwrap_err(),
+            parser::Error::UnexpectedToken(lexer::Token::AlphaNumeric("x"), 3)
+        );
+    }
+
+    #[test]
+    fn parse_middle_unexpected_token_error() {
+        let version = "1.x.3";
+
+        let parsed = version::parse(version);
+
+        assert_eq!(
+            parsed.unwrap_err(),
+            parser::Error::UnexpectedToken(lexer::Token::AlphaNumeric("x"), 3)
+        );
+    }
+
+    #[test]
+    fn parse_last_unexpected_token_error() {
+        let version = "1.2.x";
+
+        let parsed = version::parse(version);
+
+        assert_eq!(
+            parsed.unwrap_err(),
+            parser::Error::UnexpectedToken(lexer::Token::AlphaNumeric("x"), 5)
         );
     }
 

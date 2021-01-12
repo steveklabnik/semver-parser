@@ -103,6 +103,17 @@ pub enum Token<'input> {
 }
 
 impl<'input> Token<'input> {
+    // Returns the number of characters per token.
+    pub fn len(&self) -> usize {
+        match self {
+            Eq | Gt | Lt | LtEq | GtEq | Caret | Tilde | Star | Dot | Comma | Hyphen | Plus => 1,
+            Or => 2,
+            Whitespace(b_index, e_index) => e_index - b_index,
+            Numeric(num) => num.to_string().len(),
+            AlphaNumeric(alpha) => alpha.len(),
+        }
+    }
+
     /// Check if the current token is a whitespace token.
     pub fn is_whitespace(&self) -> bool {
         match *self {
@@ -302,6 +313,17 @@ mod tests {
         assert_eq!(lex("5885644aa"), vec![AlphaNumeric("5885644aa")]);
         assert_eq!(lex("beta2"), vec![AlphaNumeric("beta2")]);
         assert_eq!(lex("beta.2"), vec![AlphaNumeric("beta"), Dot, Numeric(2)]);
+    }
+
+    #[test]
+    pub fn unexpected_character_position() {
+        let mut lexer = Lexer::new("/");
+        assert_eq!(lexer.next(), Some(Err(Error::UnexpectedChar('/', 1))));
+        lexer = Lexer::new("123 */");
+        assert_eq!(lexer.next(), Some(Ok(Numeric(123))));
+        assert_eq!(lexer.next(), Some(Ok(Whitespace(3, 4))));
+        assert_eq!(lexer.next(), Some(Ok(Star)));
+        assert_eq!(lexer.next(), Some(Err(Error::UnexpectedChar('/', 6))));
     }
 
     #[test]

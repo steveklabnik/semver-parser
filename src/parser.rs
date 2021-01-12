@@ -75,10 +75,7 @@ impl<'input> Parser<'input> {
     pub fn new(input: &'input str) -> Result<Parser<'input>, Error<'input>> {
         let mut lexer = Lexer::new(input);
 
-        let mut position = 0;
-
         let c1 = if let Some(c1) = lexer.next() {
-            position += 1;
             Some(c1?)
         } else {
             None
@@ -87,7 +84,7 @@ impl<'input> Parser<'input> {
         Ok(Parser {
             lexer,
             c1,
-            position,
+            position: 0, // Start at position 0
         })
     }
 
@@ -95,9 +92,15 @@ impl<'input> Parser<'input> {
     #[inline(always)]
     fn pop(&mut self) -> Result<Token<'input>, Error<'input>> {
         let c1 = if let Some(c1) = self.lexer.next() {
-            self.position += 1;
-            Some(c1?)
+            let c1 = c1?;
+            // Count the previous characters
+            if self.c1.is_some() {
+                self.position += self.c1.as_ref().unwrap().len();
+            }
+            Some(c1)
         } else {
+            // Count the current character
+            self.position += 1;
             None
         };
 

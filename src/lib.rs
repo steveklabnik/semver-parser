@@ -20,4 +20,4 @@ pub mod parser;
 pub mod version;
 
 // Defines the type to describe where (character position) the error is
-type ErrorPosition = u32;
+type ErrorPosition = usize;
