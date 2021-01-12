@@ -92,14 +92,13 @@ impl<'input> Parser<'input> {
     #[inline(always)]
     fn pop(&mut self) -> Result<Token<'input>, Error<'input>> {
         let c1 = if let Some(c1) = self.lexer.next() {
-            let c1 = c1?;
             // Count the previous characters
             if self.c1.is_some() {
                 self.position += self.c1.as_ref().unwrap().len();
             }
-            Some(c1)
+            Some(c1?)
         } else {
-            // Count the current character
+            // Increment to get the index of the current token
             self.position += 1;
             None
         };
