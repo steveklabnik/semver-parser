@@ -155,7 +155,7 @@ impl<'input> Lexer<'input> {
         let mut chars = input.char_indices();
         let c1 = chars.next();
         let c2 = chars.next();
-        let position = 1;
+        let position = if c1.is_none() { 0 } else { 1 };
 
         Lexer {
             input,
