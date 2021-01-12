@@ -94,7 +94,7 @@ impl<'input> Parser<'input> {
         let c1 = if let Some(c1) = self.lexer.next() {
             // Count the previous characters
             if self.c1.is_some() {
-                self.position += self.c1.as_ref().unwrap().len();
+                self.position += self.peek().unwrap().len();
             }
             Some(c1?)
         } else {
