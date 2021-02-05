@@ -23,6 +23,7 @@ pub enum Rule {
   caret,
   qualifier,
   parts,
+  alphasym,
   part,
   space,
 }
@@ -550,44 +551,56 @@ impl ::pest::Parser<Rule> for SemverParser {
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
+        pub fn alphasym(
+          state: Box<::pest::ParserState<Rule>>,
+        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
+          state.rule(Rule::alphasym, |state| {
+            state
+              .match_string("-")
+              .or_else(|state| state.match_range('A'..'Z'))
+              .or_else(|state| state.match_range('a'..'z'))
+          })
+        }
+        #[inline]
+        #[allow(non_snake_case, unused_variables)]
         pub fn part(
           state: Box<::pest::ParserState<Rule>>,
         ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
           state.rule(Rule::part, |state| {
-            self::nr(state).or_else(|state| {
-              state.sequence(|state| {
-                state
-                  .match_string("-")
-                  .or_else(|state| state.match_range('0'..'9'))
-                  .or_else(|state| state.match_range('A'..'Z'))
-                  .or_else(|state| state.match_range('a'..'z'))
+            state
+              .sequence(|state| {
+                self::nr(state)
                   .and_then(|state| super::hidden::skip(state))
-                  .and_then(|state| {
-                    state.sequence(|state| {
-                      state.optional(|state| {
-                        state
-                          .match_string("-")
-                          .or_else(|state| state.match_range('0'..'9'))
-                          .or_else(|state| state.match_range('A'..'Z'))
-                          .or_else(|state| state.match_range('a'..'z'))
-                          .and_then(|state| {
-                            state.repeat(|state| {
-                              state.sequence(|state| {
-                                super::hidden::skip(state).and_then(|state| {
-                                  state
-                                    .match_string("-")
-                                    .or_else(|state| state.match_range('0'..'9'))
-                                    .or_else(|state| state.match_range('A'..'Z'))
-                                    .or_else(|state| state.match_range('a'..'z'))
+                  .and_then(|state| state.lookahead(false, |state| self::alphasym(state)))
+              })
+              .or_else(|state| {
+                state.sequence(|state| {
+                  state
+                    .match_range('0'..'9')
+                    .or_else(|state| self::alphasym(state))
+                    .and_then(|state| super::hidden::skip(state))
+                    .and_then(|state| {
+                      state.sequence(|state| {
+                        state.optional(|state| {
+                          state
+                            .match_range('0'..'9')
+                            .or_else(|state| self::alphasym(state))
+                            .and_then(|state| {
+                              state.repeat(|state| {
+                                state.sequence(|state| {
+                                  super::hidden::skip(state).and_then(|state| {
+                                    state
+                                      .match_range('0'..'9')
+                                      .or_else(|state| self::alphasym(state))
+                                  })
                                 })
                               })
                             })
-                          })
+                        })
                       })
                     })
-                  })
+                })
               })
-            })
           })
         }
         #[inline]
@@ -633,6 +646,7 @@ impl ::pest::Parser<Rule> for SemverParser {
       Rule::caret => rules::caret(state),
       Rule::qualifier => rules::qualifier(state),
       Rule::parts => rules::parts(state),
+      Rule::alphasym => rules::alphasym(state),
       Rule::part => rules::part(state),
       Rule::space => rules::space(state),
       Rule::EOI => rules::EOI(state),

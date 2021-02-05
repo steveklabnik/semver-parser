@@ -135,6 +135,7 @@ mod tests {
     }
 
     range_set_test!( one_range: "=1.2.3", 1 );
+    range_set_test!( one_range_with_alphanumerical_prerelease: "=0.3.0-alpha.2a", 1 );
     range_set_test!( one_range_cargo: "1.2.3", 2 ); // this parses as "^1.2.3"
     range_set_test!( one_range_with_space: "   =1.2.3 ", 1 );
     range_set_test!( two_ranges: ">1.2.3 || =4.5.6", 1, 1 );
@@ -161,5 +162,6 @@ mod tests {
         err_hyphen_with_gt: "1.2.3 - >3.4.5",
         err_hyphen_no_2nd_version: "1.2.3 - ",
         err_no_pre_hyphen: "~1.2.3beta",
+        err_leading_0_prerelease: "1.2.3-alpha.04",
     }
 }

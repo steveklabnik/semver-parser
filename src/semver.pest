@@ -14,5 +14,6 @@ tilde      = { ( "~>" | "~" ) ~ space* ~ partial }
 caret      = { "^" ~ space* ~ partial }
 qualifier  = { (("-" | "+") ~ parts) }
 parts      = { part ~ ("." ~ part)* }
-part       = { nr | ("-" | '0' .. '9' | 'A' .. 'Z' | 'a' .. 'z')+ }
+alphasym   = { "-" | 'A' .. 'Z' | 'a' .. 'z' }
+part       = { ( nr ~ !alphasym ) | ('0' .. '9' | alphasym)+ }
 space      = _{ " " | "\t" }
