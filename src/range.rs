@@ -32,29 +32,43 @@ pub enum Identifier {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Partial {
-    major: Option<u64>,
-    minor: Option<u64>,
-    patch: Option<u64>,
+    major: PartialToken,
+    minor: PartialToken,
+    patch: PartialToken,
     pre: Vec<Identifier>,
-    kind: PartialKind,
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum PartialKind {
-    XRangeOnly,
-    MajorOnly,
-    MajorMinor,
-    MajorMinorPatch,
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum PartialToken {
+    Some(u64),
+    Wildcard,
+    None,
+}
+
+impl PartialToken {
+    pub fn unwrap_or(self, value: u64) -> u64 {
+        match self {
+            PartialToken::Some(v) => v,
+            PartialToken::Wildcard | PartialToken::None => value,
+        }
+    }
+
+    pub fn is_some(&self) -> bool {
+        match self {
+            PartialToken::Some(_) => true,
+            PartialToken::Wildcard => false,
+            PartialToken::None => false,
+        }
+    }
 }
 
 impl Partial {
     pub fn new() -> Self {
         Self {
-            major: None,
-            minor: None,
-            patch: None,
+            major: PartialToken::None,
+            minor: PartialToken::None,
+            patch: PartialToken::None,
             pre: Vec::new(),
-            kind: PartialKind::XRangeOnly,
         }
     }
 
@@ -69,34 +83,34 @@ impl Partial {
     }
 
     pub fn inc_major(&mut self) -> &mut Self {
-        self.major = Some(self.major.unwrap_or(0) + 1);
+        self.major = PartialToken::Some(self.major.unwrap_or(0) + 1);
         self
     }
 
     pub fn inc_minor(&mut self) -> &mut Self {
-        self.minor = Some(self.minor.unwrap_or(0) + 1);
+        self.minor = PartialToken::Some(self.minor.unwrap_or(0) + 1);
         self
     }
 
     pub fn inc_patch(&mut self) -> &mut Self {
-        self.patch = Some(self.patch.unwrap_or(0) + 1);
+        self.patch = PartialToken::Some(self.patch.unwrap_or(0) + 1);
         self
     }
 
     pub fn zero_missing(&mut self) -> &mut Self {
-        self.major = Some(self.major.unwrap_or(0));
-        self.minor = Some(self.minor.unwrap_or(0));
-        self.patch = Some(self.patch.unwrap_or(0));
+        self.major = PartialToken::Some(self.major.unwrap_or(0));
+        self.minor = PartialToken::Some(self.minor.unwrap_or(0));
+        self.patch = PartialToken::Some(self.patch.unwrap_or(0));
         self
     }
 
     pub fn zero_minor(&mut self) -> &mut Self {
-        self.minor = Some(0);
+        self.minor = PartialToken::Some(0);
         self
     }
 
     pub fn zero_patch(&mut self) -> &mut Self {
-        self.patch = Some(0);
+        self.patch = PartialToken::Some(0);
         self
     }
 
@@ -163,35 +177,65 @@ pub mod simple {
 
                     let mut partial = parse_partial(components);
 
-                    match partial.kind {
-                        PartialKind::XRangeOnly => {
-                            // '*', 'x', 'X' --> ">=0.0.0"
-                            comparators.push(partial.zero_missing().as_comparator(Op::Gte));
+                    match (partial.major, partial.minor, partial.patch, compat) {
+                        (
+                            PartialToken::Some(_),
+                            PartialToken::Some(_),
+                            PartialToken::Some(_),
+                            range_set::Compat::Npm,
+                        ) => {
+                            // for node, "1.2.3" is "=1.2.3"
+                            comparators.push(partial.as_comparator(Op::Eq));
                         }
-                        PartialKind::MajorOnly => {
-                            // "1", "1.*", or "1.*.*" --> ">=1.0.0 <2.0.0"
-                            // "1.*.3" == "1.*"
-                            comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
-                            comparators
-                                .push(partial.inc_major().zero_missing().as_comparator(Op::Lt));
+                        (
+                            PartialToken::Some(_),
+                            PartialToken::Some(_),
+                            PartialToken::Some(_),
+                            range_set::Compat::Cargo,
+                        ) => {
+                            // for cargo, "1.2.3" is parsed as "^1.2.3"
+                            handle_caret_range(partial, &mut comparators);
                         }
-                        PartialKind::MajorMinor => {
-                            // "1.2" or "1.2.*" --> ">=1.2.0 <1.3.0"
+                        (
+                            PartialToken::Some(_),
+                            PartialToken::Some(_),
+                            PartialToken::None,
+                            _,
+                        ) => {
                             comparators.push(partial.clone().zero_patch().as_comparator(Op::Gte));
                             comparators
                                 .push(partial.inc_minor().zero_patch().as_comparator(Op::Lt));
                         }
-                        PartialKind::MajorMinorPatch => {
-                            match compat {
-                                range_set::Compat::Npm => {
-                                    // for node, "1.2.3" is "=1.2.3"
-                                    comparators.push(partial.as_comparator(Op::Eq));
-                                }
-                                range_set::Compat::Cargo => {
-                                    // for cargo, "1.2.3" is parsed as "^1.2.3"
-                                    handle_caret_range(partial, &mut comparators);
-                                }
-                            }
+                        (
+                            PartialToken::Some(_),
+                            PartialToken::Some(_),
+                            PartialToken::Wildcard,
+                            _,
+                        ) => {
+                            comparators.push(partial.clone().zero_patch().as_comparator(Op::Gte));
+                            comparators
+                                .push(partial.inc_minor().zero_patch().as_comparator(Op::Lt));
+                        }
+                        (PartialToken::Some(_), PartialToken::Wildcard, PartialToken::None, _)
+                        | (PartialToken::Some(_), PartialToken::None, PartialToken::None, _) => {
+                            comparators.push(
+                                partial
+                                    .clone()
+                                    .zero_minor()
+                                    .zero_patch()
+                                    .as_comparator(Op::Gte),
+                            );
+                            comparators.push(
+                                partial
+                                    .inc_major()
+                                    .zero_minor()
+                                    .zero_patch()
+                                    .as_comparator(Op::Lt),
+                            );
+                        }
+                        _ => {
+                            // '*', 'x', 'X' --> ">=0.0.0"
+                            comparators.push(partial.zero_missing().as_comparator(Op::Gte));
                         }
                     }
                 }
@@ -214,46 +258,52 @@ pub mod simple {
 
                     // equal is different because it can be a range with 2 comparators
                     if op == Op::Eq {
-                        match partial.kind {
-                            PartialKind::XRangeOnly => {
-                                // '=*' --> ">=0.0.0"
-                                comparators.push(partial.zero_missing().as_comparator(Op::Gte));
+                        match (partial.major, partial.minor, partial.patch) {
+                            (
+                                PartialToken::Some(_),
+                                PartialToken::Some(_),
+                                PartialToken::Some(_),
+                            ) => {
+                                comparators.push(partial.as_comparator(Op::Eq));
                             }
-                            PartialKind::MajorOnly => {
-                                // "=1", "=1.*", or "=1.*.*" --> ">=1.0.0 <2.0.0"
-                                comparators
-                                    .push(partial.clone().zero_missing().as_comparator(Op::Gte));
-                                comparators
-                                    .push(partial.inc_major().zero_missing().as_comparator(Op::Lt));
-                            }
-                            PartialKind::MajorMinor => {
+                            (PartialToken::Some(_), PartialToken::Some(_), _) => {
                                 // "=1.2" or "=1.2.*" --> ">=1.2.0 <1.3.0"
                                 comparators
                                     .push(partial.clone().zero_patch().as_comparator(Op::Gte));
                                 comparators
                                     .push(partial.inc_minor().zero_patch().as_comparator(Op::Lt));
                             }
-                            PartialKind::MajorMinorPatch => {
-                                comparators.push(partial.as_comparator(Op::Eq));
+                            (PartialToken::Some(_), _, _) => {
+                                // "=1", "=1.*", or "=1.*.*" --> ">=1.0.0 <2.0.0"
+                                comparators
+                                    .push(partial.clone().zero_missing().as_comparator(Op::Gte));
+                                comparators
+                                    .push(partial.inc_major().zero_missing().as_comparator(Op::Lt));
+                            }
+                            _ => {
+                                // '=*' --> ">=0.0.0"
+                                comparators.push(partial.zero_missing().as_comparator(Op::Gte));
                             }
                         }
                     } else {
-                        match partial.kind {
-                            PartialKind::XRangeOnly => {
+                        match (partial.major, partial.minor, partial.patch) {
+                            (
+                                PartialToken::Some(_),
+                                PartialToken::Some(_),
+                                PartialToken::Some(_),
+                            ) => {
+                                comparators.push(partial.as_comparator(op));
+                            }
+                            (PartialToken::Some(_), PartialToken::Some(_), _) => {
+                                // ">1.2", "<1.2.*", etc.
                                 match op {
-                                    Op::Eq => comparators
-                                        .push(partial.zero_missing().as_comparator(Op::Gte)),
-                                    Op::Lt => comparators
-                                        .push(partial.zero_missing().as_comparator(Op::Lt)),
-                                    Op::Lte => comparators
-                                        .push(partial.zero_missing().as_comparator(Op::Gte)),
-                                    Op::Gt => comparators
-                                        .push(partial.zero_missing().as_comparator(Op::Lt)),
-                                    Op::Gte => comparators
-                                        .push(partial.zero_missing().as_comparator(Op::Gte)),
+                                    Op::Lte => comparators.push(
+                                        partial.inc_minor().zero_patch().as_comparator(Op::Lt),
+                                    ),
+                                    _ => comparators.push(partial.zero_patch().as_comparator(op)),
                                 }
                             }
-                            PartialKind::MajorOnly => {
+                            (PartialToken::Some(_), _, _) => {
                                 // ">1", "=1", etc.
                                 // ">1.*.3" == ">1.*"
                                 match op {
@@ -267,17 +317,19 @@ pub mod simple {
                                     _ => comparators.push(partial.zero_missing().as_comparator(op)),
                                 }
                             }
-                            PartialKind::MajorMinor => {
-                                // ">1.2", "<1.2.*", etc.
+                            _ => {
                                 match op {
-                                    Op::Lte => comparators.push(
-                                        partial.inc_minor().zero_patch().as_comparator(Op::Lt),
-                                    ),
-                                    _ => comparators.push(partial.zero_patch().as_comparator(op)),
+                                    Op::Eq => comparators
+                                        .push(partial.zero_missing().as_comparator(Op::Gte)),
+                                    Op::Lt => comparators
+                                        .push(partial.zero_missing().as_comparator(Op::Lt)),
+                                    Op::Lte => comparators
+                                        .push(partial.zero_missing().as_comparator(Op::Gte)),
+                                    Op::Gt => comparators
+                                        .push(partial.zero_missing().as_comparator(Op::Lt)),
+                                    Op::Gte => comparators
+                                        .push(partial.zero_missing().as_comparator(Op::Gte)),
                                 }
-                            }
-                            PartialKind::MajorMinorPatch => {
-                                comparators.push(partial.as_comparator(op));
                             }
                         }
                     }
@@ -300,22 +352,8 @@ pub mod simple {
 
                     comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
 
-                    match partial.kind {
-                        PartialKind::XRangeOnly => {
-                            // "~*" --> ">=0.0.0"
-                            // which has already been added, so nothing to do here
-                        }
-                        PartialKind::MajorOnly => {
-                            // "~0" --> ">=0.0.0 <1.0.0"
-                            comparators.push(
-                                partial
-                                    .inc_major()
-                                    .zero_missing()
-                                    .no_pre()
-                                    .as_comparator(Op::Lt),
-                            );
-                        }
-                        PartialKind::MajorMinor | PartialKind::MajorMinorPatch => {
+                    match (partial.major, partial.minor, partial.patch) {
+                        (PartialToken::Some(_), PartialToken::Some(_), _) => {
                             // "~1.2" --> ">=1.2.0 <1.3.0"
                             // "~1.2.3" --> ">=1.2.3 <1.3.0"
                             comparators.push(
@@ -325,6 +363,20 @@ pub mod simple {
                                     .no_pre()
                                     .as_comparator(Op::Lt),
                             );
+                        }
+                        (PartialToken::Some(_), _, _) => {
+                            // "~0" --> ">=0.0.0 <1.0.0"
+                            comparators.push(
+                                partial
+                                    .inc_major()
+                                    .zero_missing()
+                                    .no_pre()
+                                    .as_comparator(Op::Lt),
+                            );
+                        }
+                        _ => {
+                            // "~*" --> ">=0.0.0"
+                            // which has already been added, so nothing to do here
                         }
                     }
                 }
@@ -337,21 +389,25 @@ pub mod simple {
 
     fn handle_caret_range(mut partial: Partial, comparators: &mut Vec<Comparator>) {
         // major version 0 is a special case for caret
-        if partial.major == Some(0) {
-            match partial.kind {
-                PartialKind::XRangeOnly => unreachable!(),
-                PartialKind::MajorOnly => {
-                    // "^0", "^0.*" --> ">=0.0.0 <1.0.0"
-                    comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
+        if partial.major == PartialToken::Some(0) {
+            match (partial.minor, partial.patch) {
+                (PartialToken::Some(0), PartialToken::Some(_)) => {
+                    // "^0.0.1" --> ">=0.0.1 <0.0.2"
+                    comparators.push(partial.as_comparator(Op::Gte));
+                    comparators.push(partial.inc_patch().no_pre().as_comparator(Op::Lt));
+                }
+                (PartialToken::Some(_), PartialToken::Some(_)) => {
+                    // "^0.2.3" --> ">=0.2.3 <0.3.0"
+                    comparators.push(partial.as_comparator(Op::Gte));
                     comparators.push(
                         partial
-                            .inc_major()
-                            .zero_missing()
+                            .inc_minor()
+                            .zero_patch()
                             .no_pre()
                             .as_comparator(Op::Lt),
                     );
                 }
-                PartialKind::MajorMinor => {
+                (PartialToken::Some(_), _) => {
                     // "^0.2", "^0.2.*" --> ">=0.2.0 <0.3.0"
                     comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
                     comparators.push(
@@ -362,44 +418,35 @@ pub mod simple {
                             .as_comparator(Op::Lt),
                     );
                 }
-                PartialKind::MajorMinorPatch => {
-                    if partial.minor == Some(0) {
-                        // "^0.0.1" --> ">=0.0.1 <0.0.2"
-                        comparators.push(partial.as_comparator(Op::Gte));
-                        comparators.push(partial.inc_patch().no_pre().as_comparator(Op::Lt));
-                    } else {
-                        // "^0.2.3" --> ">=0.2.3 <0.3.0"
-                        comparators.push(partial.as_comparator(Op::Gte));
-                        comparators.push(
-                            partial
-                                .inc_minor()
-                                .zero_patch()
-                                .no_pre()
-                                .as_comparator(Op::Lt),
-                        );
-                    }
-                }
-            }
-        } else {
-            match partial.kind {
-                PartialKind::XRangeOnly => {
-                    // "^*" --> ">=0.0.0"
-                    comparators.push(partial.zero_missing().as_comparator(Op::Gte));
-                }
                 _ => {
-                    // "^1", "^1.*" --> ">=1.0.0 <2.0.0"
-                    // "^1.2", "^1.2.*" --> ">=1.2.0 <2.0.0"
-                    // "^1.2.3" --> ">=1.2.3 <2.0.0"
+                    // "^0", "^0.*" --> ">=0.0.0 <1.0.0"
                     comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
                     comparators.push(
                         partial
                             .inc_major()
-                            .zero_minor()
-                            .zero_patch()
+                            .zero_missing()
                             .no_pre()
                             .as_comparator(Op::Lt),
                     );
                 }
+            }
+        } else {
+            if let PartialToken::Some(_) = partial.major {
+                // "^1", "^1.*" --> ">=1.0.0 <2.0.0"
+                // "^1.2", "^1.2.*" --> ">=1.2.0 <2.0.0"
+                // "^1.2.3" --> ">=1.2.3 <2.0.0"
+                comparators.push(partial.clone().zero_missing().as_comparator(Op::Gte));
+                comparators.push(
+                    partial
+                        .inc_major()
+                        .zero_minor()
+                        .zero_patch()
+                        .no_pre()
+                        .as_comparator(Op::Lt),
+                );
+            } else {
+                // "^*" --> ">=0.0.0"
+                comparators.push(partial.zero_missing().as_comparator(Op::Gte));
             }
         }
     }
@@ -419,25 +466,26 @@ pub mod simple {
 
         let components1: Vec<_> = records.next().unwrap().into_inner().collect();
         let mut partial1 = parse_partial(components1);
-        match partial1.kind {
-            PartialKind::XRangeOnly => {
-                // don't need to include this - the range will be limited by the 2nd part of hyphen
-                // range
-            }
-            _ => comparators.push(partial1.zero_missing().as_comparator(Op::Gte)),
+
+        // don't need to include wildcards - the range will be limited by the 2nd part of hyphen
+        // range
+        if partial1.major.is_some() {
+            comparators.push(partial1.zero_missing().as_comparator(Op::Gte));
         }
 
         let components2: Vec<_> = records.next().unwrap().into_inner().collect();
         let mut partial2 = parse_partial(components2);
 
-        match partial2.kind {
-            PartialKind::XRangeOnly => {
-                // only include this if the first part of the hyphen range was also '*'
-                if partial1.kind == PartialKind::XRangeOnly {
-                    comparators.push(partial2.zero_missing().as_comparator(Op::Gte));
-                }
+        match (partial2.major, partial2.minor, partial2.patch) {
+            (PartialToken::Some(_), PartialToken::Some(_), PartialToken::Some(_)) => {
+                // "1.2.3 - 2.3.4" --> ">=1.2.3 <=2.3.4"
+                comparators.push(partial2.as_comparator(Op::Lte));
             }
-            PartialKind::MajorOnly => {
+            (PartialToken::Some(_), PartialToken::Some(_), _) => {
+                // "1.2.3 - 2.3.x" --> ">=1.2.3 <2.4.0"
+                comparators.push(partial2.inc_minor().zero_patch().as_comparator(Op::Lt));
+            }
+            (PartialToken::Some(_), _, _) => {
                 // "1.2.3 - 2" --> ">=1.2.3 <3.0.0"
                 comparators.push(
                     partial2
@@ -447,13 +495,11 @@ pub mod simple {
                         .as_comparator(Op::Lt),
                 );
             }
-            PartialKind::MajorMinor => {
-                // "1.2.3 - 2.3.x" --> ">=1.2.3 <2.4.0"
-                comparators.push(partial2.inc_minor().zero_patch().as_comparator(Op::Lt));
-            }
-            PartialKind::MajorMinorPatch => {
-                // "1.2.3 - 2.3.4" --> ">=1.2.3 <=2.3.4"
-                comparators.push(partial2.as_comparator(Op::Lte));
+            _ => {
+                // only include this if the first part of the hyphen range was also '*'
+                if !partial1.major.is_some() {
+                    comparators.push(partial2.zero_missing().as_comparator(Op::Gte));
+                }
             }
         }
 
@@ -472,13 +518,12 @@ pub mod simple {
                 match inner.as_rule() {
                     Rule::xr_op => {
                         // for "*", ">=*", etc.
-                        partial.major = None;
-                        partial.kind = PartialKind::XRangeOnly;
+                        partial.major = PartialToken::Wildcard;
                         // end the pattern here
                         return partial;
                     }
                     Rule::nr => {
-                        partial.major = Some(inner.as_str().parse::<u64>().unwrap());
+                        partial.major = PartialToken::Some(inner.as_str().parse::<u64>().unwrap());
                     }
                     _ => unreachable!(),
                 }
@@ -487,8 +532,6 @@ pub mod simple {
         }
 
         if components.is_empty() {
-            // only the major has been given
-            partial.kind = PartialKind::MajorOnly;
             return partial;
         } else {
             let two = components.remove(0);
@@ -498,13 +541,12 @@ pub mod simple {
                     let inner = two.into_inner().next().unwrap();
                     match inner.as_rule() {
                         Rule::xr_op => {
-                            partial.minor = None;
-                            // only the major has been given, minor is xrange (ignore anything after)
-                            partial.kind = PartialKind::MajorOnly;
+                            partial.minor = PartialToken::Wildcard;
                             return partial;
                         }
                         Rule::nr => {
-                            partial.minor = Some(inner.as_str().parse::<u64>().unwrap());
+                            partial.minor =
+                                PartialToken::Some(inner.as_str().parse::<u64>().unwrap());
                         }
                         _ => unreachable!(),
                     }
@@ -514,8 +556,6 @@ pub mod simple {
         }
 
         if components.is_empty() {
-            // only major and minor have been given
-            partial.kind = PartialKind::MajorMinor;
             return partial;
         } else {
             let three = components.remove(0);
@@ -525,13 +565,12 @@ pub mod simple {
                     let inner = three.into_inner().next().unwrap();
                     match inner.as_rule() {
                         Rule::xr_op => {
-                            partial.patch = None;
-                            // only major and minor have been given, patch is xrange
-                            partial.kind = PartialKind::MajorMinor;
+                            partial.patch = PartialToken::Wildcard;
                             return partial;
                         }
                         Rule::nr => {
-                            partial.patch = Some(inner.as_str().parse::<u64>().unwrap());
+                            partial.patch =
+                                PartialToken::Some(inner.as_str().parse::<u64>().unwrap());
                         }
                         _ => unreachable!(),
                     }
@@ -539,9 +578,6 @@ pub mod simple {
                 _ => unreachable!(),
             }
         }
-
-        // at this point we at least have all three fields
-        partial.kind = PartialKind::MajorMinorPatch;
 
         if !components.is_empty() {
             // there's only going to be one, let's move it out
