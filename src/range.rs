@@ -200,9 +200,26 @@ pub mod simple {
                             PartialToken::Some(_),
                             PartialToken::Some(_),
                             PartialToken::None,
-                            _,
+                            range_set::Compat::Cargo,
                         ) => {
                             comparators.push(partial.clone().zero_patch().as_comparator(Op::Gte));
+                            // for cargo, "1.2" --> ">=1.2.0 <2.0.0"
+                            comparators.push(
+                                partial
+                                    .inc_major()
+                                    .zero_minor()
+                                    .zero_patch()
+                                    .as_comparator(Op::Lt),
+                            );
+                        }
+                        (
+                            PartialToken::Some(_),
+                            PartialToken::Some(_),
+                            PartialToken::None,
+                            range_set::Compat::Npm,
+                        ) => {
+                            comparators.push(partial.clone().zero_patch().as_comparator(Op::Gte));
+                            // for node, "1.2" --> ">=1.2.0 <1.3.0"
                             comparators
                                 .push(partial.inc_minor().zero_patch().as_comparator(Op::Lt));
                         }
@@ -764,7 +781,7 @@ mod tests {
 
     range_tests! {
         major: ("1", comp_sets!( [op!(">="), 1, 0, 0], [op!("<"), 2, 0, 0] )),
-        major_minor: ("1.2", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
+        major_minor: ("1.2", comp_sets!( [op!(">="), 1, 2, 0], [op!("<"), 2, 0, 0] )),
         major_minor_patch: ("1.2.3", comp_sets!( [op!(">="), 1, 2, 3], [op!("<"), 2, 0, 0] )),
         major_0_minor_patch: ("0.2.3", comp_sets!( [op!(">="), 0, 2, 3], [op!("<"), 0, 3, 0] )),
         major_0_minor_0_patch: ("0.0.1", comp_sets!( [op!(">="), 0, 0, 1], [op!("<"), 0, 0, 2] )),
@@ -897,5 +914,6 @@ mod tests {
 
     range_tests_nodecompat! {
         node_major_minor_patch: ("1.2.3", comp_sets_node!( [op!("="), 1, 2, 3] )),
+        node_major_minor: ("1.2", comp_sets_node!( [op!(">="), 1, 2, 0], [op!("<"), 1, 3, 0] )),
     }
 }
