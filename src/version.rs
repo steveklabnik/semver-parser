@@ -213,7 +213,7 @@ mod tests {
 
         assert!(
             parsed.is_err(),
-            format!("'{}' incorrectly considered a valid parse", version)
+            "'{}' incorrectly considered a valid parse", version
         );
     }
 
@@ -225,7 +225,7 @@ mod tests {
 
         assert!(
             parsed.is_err(),
-            format!("'{}' incorrectly considered a valid parse", version)
+            "'{}' incorrectly considered a valid parse", version
         );
     }
 
@@ -237,7 +237,7 @@ mod tests {
 
         assert!(
             parsed.is_err(),
-            format!("'{}' incorrectly considered a valid parse", version)
+            "'{}' incorrectly considered a valid parse", version
         );
     }
 
@@ -249,7 +249,7 @@ mod tests {
 
         assert!(
             parsed.is_err(),
-            format!("'{}' incorrectly considered a valid parse", version)
+            "'{}' incorrectly considered a valid parse", version
         );
     }
 
@@ -261,7 +261,7 @@ mod tests {
 
         assert!(
             parsed.is_err(),
-            format!("'{}' incorrectly considered a valid parse", version)
+            "'{}' incorrectly considered a valid parse", version
         );
     }
 
