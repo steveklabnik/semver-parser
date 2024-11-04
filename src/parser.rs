@@ -151,6 +151,14 @@ impl<'input> Parser<'input> {
     ///
     /// Like, `foo`, or `bar`, or `beta-1`.
     pub fn identifier(&mut self) -> Result<Identifier, Error<'input>> {
+        self.bounded_identifier(0)
+    }
+
+    fn bounded_identifier(&mut self, count: u32) -> Result<Identifier, Error<'input>> {
+        if count > 255 {
+            panic!("Cannot have more than 255 identifiers");
+        }
+
         let identifier = match self.pop()? {
             Token::AlphaNumeric(identifier) => {
                 // TODO: Borrow?
@@ -166,7 +174,7 @@ impl<'input> Parser<'input> {
             // concat with any following identifiers
             Ok(identifier
                 .concat("-")
-                .concat(&self.identifier()?.to_string()))
+                .concat(&self.bounded_identifier(count + 1)?.to_string()))
         } else {
             Ok(identifier)
         }
@@ -259,4 +267,18 @@ impl<'input> Parser<'input> {
 
         Ok(out)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::version::parse;
+
+    #[test]
+    #[should_panic(expected = "Cannot have more than 255 identifiers")]
+    fn fuzz_0001() {
+        let version = std::fs::read_to_string("tests/fixtures/fuzz-0001.txt").expect("should be able to read version from file");
+
+        parse(&version).ok();
+    }
+
 }
