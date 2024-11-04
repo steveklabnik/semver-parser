@@ -3,28 +3,55 @@
 #![allow(unused_attributes)]
 use super::SemverParser;
 
-#[allow(dead_code, non_camel_case_types)]
+#[allow(non_upper_case_globals)]
+const _PEST_GRAMMAR_SemverParser: [&'static str; 0usize] = [];
+#[allow(dead_code, non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Rule {
+  #[doc = "End-of-input"]
   EOI,
-  range_set,
-  logical_or,
-  range,
-  empty,
-  hyphen,
-  simple,
-  primitive,
-  primitive_op,
-  partial,
-  xr,
-  xr_op,
-  nr,
-  tilde,
-  caret,
-  qualifier,
-  parts,
-  part,
-  space,
+  r#range_set,
+  r#logical_or,
+  r#range,
+  r#empty,
+  r#hyphen,
+  r#simple,
+  r#primitive,
+  r#primitive_op,
+  r#partial,
+  r#xr,
+  r#xr_op,
+  r#nr,
+  r#tilde,
+  r#caret,
+  r#qualifier,
+  r#parts,
+  r#part,
+  r#space,
+}
+impl Rule {
+  pub fn all_rules() -> &'static [Rule] {
+    &[
+      Rule::r#range_set,
+      Rule::r#logical_or,
+      Rule::r#range,
+      Rule::r#empty,
+      Rule::r#hyphen,
+      Rule::r#simple,
+      Rule::r#primitive,
+      Rule::r#primitive_op,
+      Rule::r#partial,
+      Rule::r#xr,
+      Rule::r#xr_op,
+      Rule::r#nr,
+      Rule::r#tilde,
+      Rule::r#caret,
+      Rule::r#qualifier,
+      Rule::r#parts,
+      Rule::r#part,
+      Rule::r#space,
+    ]
+  }
 }
 #[allow(clippy::all)]
 impl ::pest::Parser<Rule> for SemverParser {
@@ -33,13 +60,14 @@ impl ::pest::Parser<Rule> for SemverParser {
     input: &'i str,
   ) -> ::std::result::Result<::pest::iterators::Pairs<'i, Rule>, ::pest::error::Error<Rule>> {
     mod rules {
+      #![allow(clippy::upper_case_acronyms)]
       pub mod hidden {
         use super::super::Rule;
         #[inline]
         #[allow(dead_code, non_snake_case, unused_variables)]
         pub fn skip(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
           Ok(state)
         }
       }
@@ -47,20 +75,20 @@ impl ::pest::Parser<Rule> for SemverParser {
         use super::super::Rule;
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn range_set(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::range_set, |state| {
+        pub fn r#range_set(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#range_set, |state| {
             state.sequence(|state| {
-              self::SOI(state)
+              self::r#SOI(state)
                 .and_then(|state| super::hidden::skip(state))
                 .and_then(|state| {
                   state.sequence(|state| {
                     state.optional(|state| {
-                      self::space(state).and_then(|state| {
+                      self::r#space(state).and_then(|state| {
                         state.repeat(|state| {
                           state.sequence(|state| {
-                            super::hidden::skip(state).and_then(|state| self::space(state))
+                            super::hidden::skip(state).and_then(|state| self::r#space(state))
                           })
                         })
                       })
@@ -68,25 +96,25 @@ impl ::pest::Parser<Rule> for SemverParser {
                   })
                 })
                 .and_then(|state| super::hidden::skip(state))
-                .and_then(|state| self::range(state))
+                .and_then(|state| self::r#range(state))
                 .and_then(|state| super::hidden::skip(state))
                 .and_then(|state| {
                   state.sequence(|state| {
                     state.optional(|state| {
                       state
                         .sequence(|state| {
-                          self::logical_or(state)
+                          self::r#logical_or(state)
                             .and_then(|state| super::hidden::skip(state))
-                            .and_then(|state| self::range(state))
+                            .and_then(|state| self::r#range(state))
                         })
                         .and_then(|state| {
                           state.repeat(|state| {
                             state.sequence(|state| {
                               super::hidden::skip(state).and_then(|state| {
                                 state.sequence(|state| {
-                                  self::logical_or(state)
+                                  self::r#logical_or(state)
                                     .and_then(|state| super::hidden::skip(state))
-                                    .and_then(|state| self::range(state))
+                                    .and_then(|state| self::r#range(state))
                                 })
                               })
                             })
@@ -99,10 +127,10 @@ impl ::pest::Parser<Rule> for SemverParser {
                 .and_then(|state| {
                   state.sequence(|state| {
                     state.optional(|state| {
-                      self::space(state).and_then(|state| {
+                      self::r#space(state).and_then(|state| {
                         state.repeat(|state| {
                           state.sequence(|state| {
-                            super::hidden::skip(state).and_then(|state| self::space(state))
+                            super::hidden::skip(state).and_then(|state| self::r#space(state))
                           })
                         })
                       })
@@ -110,24 +138,24 @@ impl ::pest::Parser<Rule> for SemverParser {
                   })
                 })
                 .and_then(|state| super::hidden::skip(state))
-                .and_then(|state| self::EOI(state))
+                .and_then(|state| self::r#EOI(state))
             })
           })
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn logical_or(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::logical_or, |state| {
+        pub fn r#logical_or(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#logical_or, |state| {
             state.sequence(|state| {
               state
                 .sequence(|state| {
                   state.optional(|state| {
-                    self::space(state).and_then(|state| {
+                    self::r#space(state).and_then(|state| {
                       state.repeat(|state| {
                         state.sequence(|state| {
-                          super::hidden::skip(state).and_then(|state| self::space(state))
+                          super::hidden::skip(state).and_then(|state| self::r#space(state))
                         })
                       })
                     })
@@ -139,10 +167,10 @@ impl ::pest::Parser<Rule> for SemverParser {
                 .and_then(|state| {
                   state.sequence(|state| {
                     state.optional(|state| {
-                      self::space(state).and_then(|state| {
+                      self::r#space(state).and_then(|state| {
                         state.repeat(|state| {
                           state.sequence(|state| {
-                            super::hidden::skip(state).and_then(|state| self::space(state))
+                            super::hidden::skip(state).and_then(|state| self::r#space(state))
                           })
                         })
                       })
@@ -154,14 +182,14 @@ impl ::pest::Parser<Rule> for SemverParser {
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn range(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::range, |state| {
-            self::hyphen(state)
+        pub fn r#range(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#range, |state| {
+            self::r#hyphen(state)
               .or_else(|state| {
                 state.sequence(|state| {
-                  self::simple(state)
+                  self::r#simple(state)
                     .and_then(|state| super::hidden::skip(state))
                     .and_then(|state| {
                       state.sequence(|state| {
@@ -173,16 +201,16 @@ impl ::pest::Parser<Rule> for SemverParser {
                                 .and_then(|state| super::hidden::skip(state))
                                 .and_then(|state| {
                                   state.sequence(|state| {
-                                    self::space(state)
+                                    self::r#space(state)
                                       .and_then(|state| super::hidden::skip(state))
                                       .and_then(|state| {
                                         state.sequence(|state| {
                                           state.optional(|state| {
-                                            self::space(state).and_then(|state| {
+                                            self::r#space(state).and_then(|state| {
                                               state.repeat(|state| {
                                                 state.sequence(|state| {
                                                   super::hidden::skip(state)
-                                                    .and_then(|state| self::space(state))
+                                                    .and_then(|state| self::r#space(state))
                                                 })
                                               })
                                             })
@@ -192,7 +220,7 @@ impl ::pest::Parser<Rule> for SemverParser {
                                   })
                                 })
                                 .and_then(|state| super::hidden::skip(state))
-                                .and_then(|state| self::simple(state))
+                                .and_then(|state| self::r#simple(state))
                             })
                             .and_then(|state| {
                               state.repeat(|state| {
@@ -204,16 +232,16 @@ impl ::pest::Parser<Rule> for SemverParser {
                                         .and_then(|state| super::hidden::skip(state))
                                         .and_then(|state| {
                                           state.sequence(|state| {
-                                            self::space(state)
+                                            self::r#space(state)
                                               .and_then(|state| super::hidden::skip(state))
                                               .and_then(|state| {
                                                 state.sequence(|state| {
                                                   state.optional(|state| {
-                                                    self::space(state).and_then(|state| {
+                                                    self::r#space(state).and_then(|state| {
                                                       state.repeat(|state| {
                                                         state.sequence(|state| {
                                                           super::hidden::skip(state)
-                                                            .and_then(|state| self::space(state))
+                                                            .and_then(|state| self::r#space(state))
                                                         })
                                                       })
                                                     })
@@ -223,7 +251,7 @@ impl ::pest::Parser<Rule> for SemverParser {
                                           })
                                         })
                                         .and_then(|state| super::hidden::skip(state))
-                                        .and_then(|state| self::simple(state))
+                                        .and_then(|state| self::r#simple(state))
                                     })
                                   })
                                 })
@@ -234,36 +262,36 @@ impl ::pest::Parser<Rule> for SemverParser {
                     })
                 })
               })
-              .or_else(|state| self::empty(state))
+              .or_else(|state| self::r#empty(state))
           })
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn empty(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::empty, |state| state.match_string(""))
+        pub fn r#empty(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#empty, |state| state.match_string(""))
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn hyphen(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::hyphen, |state| {
+        pub fn r#hyphen(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#hyphen, |state| {
             state.sequence(|state| {
-              self::partial(state)
+              self::r#partial(state)
                 .and_then(|state| super::hidden::skip(state))
                 .and_then(|state| {
                   state.sequence(|state| {
-                    self::space(state)
+                    self::r#space(state)
                       .and_then(|state| super::hidden::skip(state))
                       .and_then(|state| {
                         state.sequence(|state| {
                           state.optional(|state| {
-                            self::space(state).and_then(|state| {
+                            self::r#space(state).and_then(|state| {
                               state.repeat(|state| {
                                 state.sequence(|state| {
-                                  super::hidden::skip(state).and_then(|state| self::space(state))
+                                  super::hidden::skip(state).and_then(|state| self::r#space(state))
                                 })
                               })
                             })
@@ -277,15 +305,15 @@ impl ::pest::Parser<Rule> for SemverParser {
                 .and_then(|state| super::hidden::skip(state))
                 .and_then(|state| {
                   state.sequence(|state| {
-                    self::space(state)
+                    self::r#space(state)
                       .and_then(|state| super::hidden::skip(state))
                       .and_then(|state| {
                         state.sequence(|state| {
                           state.optional(|state| {
-                            self::space(state).and_then(|state| {
+                            self::r#space(state).and_then(|state| {
                               state.repeat(|state| {
                                 state.sequence(|state| {
-                                  super::hidden::skip(state).and_then(|state| self::space(state))
+                                  super::hidden::skip(state).and_then(|state| self::r#space(state))
                                 })
                               })
                             })
@@ -295,38 +323,38 @@ impl ::pest::Parser<Rule> for SemverParser {
                   })
                 })
                 .and_then(|state| super::hidden::skip(state))
-                .and_then(|state| self::partial(state))
+                .and_then(|state| self::r#partial(state))
             })
           })
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn simple(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::simple, |state| {
-            self::primitive(state)
-              .or_else(|state| self::partial(state))
-              .or_else(|state| self::tilde(state))
-              .or_else(|state| self::caret(state))
+        pub fn r#simple(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#simple, |state| {
+            self::r#primitive(state)
+              .or_else(|state| self::r#partial(state))
+              .or_else(|state| self::r#tilde(state))
+              .or_else(|state| self::r#caret(state))
           })
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn primitive(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::primitive, |state| {
+        pub fn r#primitive(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#primitive, |state| {
             state.sequence(|state| {
-              self::primitive_op(state)
+              self::r#primitive_op(state)
                 .and_then(|state| super::hidden::skip(state))
                 .and_then(|state| {
                   state.sequence(|state| {
                     state.optional(|state| {
-                      self::space(state).and_then(|state| {
+                      self::r#space(state).and_then(|state| {
                         state.repeat(|state| {
                           state.sequence(|state| {
-                            super::hidden::skip(state).and_then(|state| self::space(state))
+                            super::hidden::skip(state).and_then(|state| self::r#space(state))
                           })
                         })
                       })
@@ -334,16 +362,16 @@ impl ::pest::Parser<Rule> for SemverParser {
                   })
                 })
                 .and_then(|state| super::hidden::skip(state))
-                .and_then(|state| self::partial(state))
+                .and_then(|state| self::r#partial(state))
             })
           })
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn primitive_op(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::primitive_op, |state| {
+        pub fn r#primitive_op(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#primitive_op, |state| {
             state
               .match_string("<=")
               .or_else(|state| state.match_string(">="))
@@ -354,12 +382,12 @@ impl ::pest::Parser<Rule> for SemverParser {
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn partial(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::partial, |state| {
+        pub fn r#partial(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#partial, |state| {
             state.sequence(|state| {
-              self::xr(state)
+              self::r#xr(state)
                 .and_then(|state| super::hidden::skip(state))
                 .and_then(|state| {
                   state.optional(|state| {
@@ -367,7 +395,7 @@ impl ::pest::Parser<Rule> for SemverParser {
                       state
                         .match_string(".")
                         .and_then(|state| super::hidden::skip(state))
-                        .and_then(|state| self::xr(state))
+                        .and_then(|state| self::r#xr(state))
                         .and_then(|state| super::hidden::skip(state))
                         .and_then(|state| {
                           state.optional(|state| {
@@ -375,9 +403,9 @@ impl ::pest::Parser<Rule> for SemverParser {
                               state
                                 .match_string(".")
                                 .and_then(|state| super::hidden::skip(state))
-                                .and_then(|state| self::xr(state))
+                                .and_then(|state| self::r#xr(state))
                                 .and_then(|state| super::hidden::skip(state))
-                                .and_then(|state| state.optional(|state| self::qualifier(state)))
+                                .and_then(|state| state.optional(|state| self::r#qualifier(state)))
                             })
                           })
                         })
@@ -389,19 +417,19 @@ impl ::pest::Parser<Rule> for SemverParser {
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn xr(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::xr, |state| {
-            self::xr_op(state).or_else(|state| self::nr(state))
+        pub fn r#xr(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#xr, |state| {
+            self::r#xr_op(state).or_else(|state| self::r#nr(state))
           })
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn xr_op(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::xr_op, |state| {
+        pub fn r#xr_op(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#xr_op, |state| {
             state
               .match_string("x")
               .or_else(|state| state.match_string("X"))
@@ -410,10 +438,10 @@ impl ::pest::Parser<Rule> for SemverParser {
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn nr(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::nr, |state| {
+        pub fn r#nr(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#nr, |state| {
             state.match_string("0").or_else(|state| {
               state.sequence(|state| {
                 state
@@ -439,10 +467,10 @@ impl ::pest::Parser<Rule> for SemverParser {
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn tilde(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::tilde, |state| {
+        pub fn r#tilde(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#tilde, |state| {
             state.sequence(|state| {
               state
                 .match_string("~>")
@@ -451,10 +479,10 @@ impl ::pest::Parser<Rule> for SemverParser {
                 .and_then(|state| {
                   state.sequence(|state| {
                     state.optional(|state| {
-                      self::space(state).and_then(|state| {
+                      self::r#space(state).and_then(|state| {
                         state.repeat(|state| {
                           state.sequence(|state| {
-                            super::hidden::skip(state).and_then(|state| self::space(state))
+                            super::hidden::skip(state).and_then(|state| self::r#space(state))
                           })
                         })
                       })
@@ -462,16 +490,16 @@ impl ::pest::Parser<Rule> for SemverParser {
                   })
                 })
                 .and_then(|state| super::hidden::skip(state))
-                .and_then(|state| self::partial(state))
+                .and_then(|state| self::r#partial(state))
             })
           })
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn caret(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::caret, |state| {
+        pub fn r#caret(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#caret, |state| {
             state.sequence(|state| {
               state
                 .match_string("^")
@@ -479,10 +507,10 @@ impl ::pest::Parser<Rule> for SemverParser {
                 .and_then(|state| {
                   state.sequence(|state| {
                     state.optional(|state| {
-                      self::space(state).and_then(|state| {
+                      self::r#space(state).and_then(|state| {
                         state.repeat(|state| {
                           state.sequence(|state| {
-                            super::hidden::skip(state).and_then(|state| self::space(state))
+                            super::hidden::skip(state).and_then(|state| self::r#space(state))
                           })
                         })
                       })
@@ -490,33 +518,33 @@ impl ::pest::Parser<Rule> for SemverParser {
                   })
                 })
                 .and_then(|state| super::hidden::skip(state))
-                .and_then(|state| self::partial(state))
+                .and_then(|state| self::r#partial(state))
             })
           })
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn qualifier(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::qualifier, |state| {
+        pub fn r#qualifier(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#qualifier, |state| {
             state.sequence(|state| {
               state
                 .match_string("-")
                 .or_else(|state| state.match_string("+"))
                 .and_then(|state| super::hidden::skip(state))
-                .and_then(|state| self::parts(state))
+                .and_then(|state| self::r#parts(state))
             })
           })
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn parts(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::parts, |state| {
+        pub fn r#parts(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#parts, |state| {
             state.sequence(|state| {
-              self::part(state)
+              self::r#part(state)
                 .and_then(|state| super::hidden::skip(state))
                 .and_then(|state| {
                   state.sequence(|state| {
@@ -526,7 +554,7 @@ impl ::pest::Parser<Rule> for SemverParser {
                           state
                             .match_string(".")
                             .and_then(|state| super::hidden::skip(state))
-                            .and_then(|state| self::part(state))
+                            .and_then(|state| self::r#part(state))
                         })
                         .and_then(|state| {
                           state.repeat(|state| {
@@ -536,7 +564,7 @@ impl ::pest::Parser<Rule> for SemverParser {
                                   state
                                     .match_string(".")
                                     .and_then(|state| super::hidden::skip(state))
-                                    .and_then(|state| self::part(state))
+                                    .and_then(|state| self::r#part(state))
                                 })
                               })
                             })
@@ -550,11 +578,11 @@ impl ::pest::Parser<Rule> for SemverParser {
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn part(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
-          state.rule(Rule::part, |state| {
-            self::nr(state).or_else(|state| {
+        pub fn r#part(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
+          state.rule(Rule::r#part, |state| {
+            self::r#nr(state).or_else(|state| {
               state.sequence(|state| {
                 state
                   .match_string("-")
@@ -592,9 +620,9 @@ impl ::pest::Parser<Rule> for SemverParser {
         }
         #[inline]
         #[allow(non_snake_case, unused_variables)]
-        pub fn space(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
+        pub fn r#space(
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
           state
             .match_string(" ")
             .or_else(|state| state.match_string("\t"))
@@ -602,39 +630,39 @@ impl ::pest::Parser<Rule> for SemverParser {
         #[inline]
         #[allow(dead_code, non_snake_case, unused_variables)]
         pub fn EOI(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
           state.rule(Rule::EOI, |state| state.end_of_input())
         }
         #[inline]
         #[allow(dead_code, non_snake_case, unused_variables)]
         pub fn SOI(
-          state: Box<::pest::ParserState<Rule>>,
-        ) -> ::pest::ParseResult<Box<::pest::ParserState<Rule>>> {
+          state: ::std::boxed::Box<::pest::ParserState<'_, Rule>>,
+        ) -> ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_, Rule>>> {
           state.start_of_input()
         }
       }
       pub use self::visible::*;
     }
     ::pest::state(input, |state| match rule {
-      Rule::range_set => rules::range_set(state),
-      Rule::logical_or => rules::logical_or(state),
-      Rule::range => rules::range(state),
-      Rule::empty => rules::empty(state),
-      Rule::hyphen => rules::hyphen(state),
-      Rule::simple => rules::simple(state),
-      Rule::primitive => rules::primitive(state),
-      Rule::primitive_op => rules::primitive_op(state),
-      Rule::partial => rules::partial(state),
-      Rule::xr => rules::xr(state),
-      Rule::xr_op => rules::xr_op(state),
-      Rule::nr => rules::nr(state),
-      Rule::tilde => rules::tilde(state),
-      Rule::caret => rules::caret(state),
-      Rule::qualifier => rules::qualifier(state),
-      Rule::parts => rules::parts(state),
-      Rule::part => rules::part(state),
-      Rule::space => rules::space(state),
+      Rule::r#range_set => rules::r#range_set(state),
+      Rule::r#logical_or => rules::r#logical_or(state),
+      Rule::r#range => rules::r#range(state),
+      Rule::r#empty => rules::r#empty(state),
+      Rule::r#hyphen => rules::r#hyphen(state),
+      Rule::r#simple => rules::r#simple(state),
+      Rule::r#primitive => rules::r#primitive(state),
+      Rule::r#primitive_op => rules::r#primitive_op(state),
+      Rule::r#partial => rules::r#partial(state),
+      Rule::r#xr => rules::r#xr(state),
+      Rule::r#xr_op => rules::r#xr_op(state),
+      Rule::r#nr => rules::r#nr(state),
+      Rule::r#tilde => rules::r#tilde(state),
+      Rule::r#caret => rules::r#caret(state),
+      Rule::r#qualifier => rules::r#qualifier(state),
+      Rule::r#parts => rules::r#parts(state),
+      Rule::r#part => rules::r#part(state),
+      Rule::r#space => rules::r#space(state),
       Rule::EOI => rules::EOI(state),
     })
   }
